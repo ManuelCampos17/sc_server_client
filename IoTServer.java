@@ -13,13 +13,13 @@ public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
 
     //User -> Password
-    private Map<String, String> userCredentials = new HashMap<>();
+    private static Map<String, String> userCredentials = new HashMap<>();
     
     //Domains
     private Map<String, Domain> domains = new HashMap<>();
 
     //Dev-id connected
-    private Map<String, Domain> connected = new HashMap<>();
+    private static Map<String, String> connected = new HashMap<>();
 
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
@@ -39,14 +39,20 @@ public class IoTServer {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleClient(clientSocket)).start();
+                new Thread(() -> {
+                    try {
+                        handleClient(clientSocket);
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private void handleClient(Socket clientSocket) {
+    private static void handleClient(Socket clientSocket) throws ClassNotFoundException {
         try (
             ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
@@ -54,14 +60,14 @@ public class IoTServer {
             String login = (String) in.readObject();
             String[] temp = login.split(":");
 
-            if (!users.containsKey(temp[0])) {
+            if (!userCredentials.containsKey(temp[0])) {
                 //Novo user
 
                 //Escrever no credentials file
                 FileWriter myWriter = new FileWriter("userCredentials.txt");
                 myWriter.write(login);
                 myWriter.close();
-                userCredentials.put(temp[0], temp[1])
+                userCredentials.put(temp[0], temp[1]);
 
                 out.writeObject("OK-NEW-USER");
                 out.flush();
@@ -89,7 +95,7 @@ public class IoTServer {
                     dev_id = (String) in.readObject();
                 }
 
-                connected.put(temp[0], dev_id)
+                connected.put(temp[0], dev_id);
 
                 out.writeObject("OK-DEVID");
                 out.flush();
@@ -115,7 +121,8 @@ public class IoTServer {
         }
 
         public Map<String, Boolean> getReadPermissions() {
-            return readPermissions;
+            return null;
+            // return readPermissions;
         }
     }
 }
