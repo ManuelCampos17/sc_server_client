@@ -3,6 +3,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedList;
 
 // IoTServer [port]
 // • [port] identifica o porto (TCP) para aceitar ligações de clientes. Por omissão, o servidor
@@ -15,11 +16,11 @@ public class IoTServer {
     //User -> Password
     private static Map<String, String> userCredentials = new HashMap<>();
     
-    //Domains
+    //Nome do domain -> Tipo que ainda vou definir (maybe lista de users q la tao)
     private Map<String, Domain> domains = new HashMap<>();
 
     //Dev-id connected
-    private static Map<String, String> connected = new HashMap<>();
+    private static Map<String, LinkedList<String>> connected = new HashMap<String, LinkedList<String>>();
 
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
@@ -60,52 +61,75 @@ public class IoTServer {
             String login = (String) in.readObject();
             String[] temp = login.split(":");
 
-            if (!userCredentials.containsKey(temp[0])) {
-                //Novo user
+            //Handle Auth
+            handleAuth(in, out, login, temp[0], temp[1]);
 
-                //Escrever no credentials file
-                FileWriter myWriter = new FileWriter("userCredentials.txt");
-                myWriter.write(login);
-                myWriter.close();
-                userCredentials.put(temp[0], temp[1]);
+            //Handle Auth Dev-id
+            String dev_id = (String) in.readObject();
+            handleDevId(in, out, temp[0], dev_id);
 
-                out.writeObject("OK-NEW-USER");
-                out.flush();
-            }
-            else
-            {
-                //User existe
+            //Handle file size
 
-                //Auth password
-                String currPass = (String) in.readObject();
-                while (!userCredentials.get(temp[0]).equals(currPass)) {
-                    out.writeObject("WRONG-PWD");
-                    out.flush();
-                    currPass = (String) in.readObject();
-                }
-
-                out.writeObject("OK-USER");
-                out.flush();
-                
-                //Auth dev-id (LISTA NO VALUE)
-                String dev_id = (String) in.readObject();
-                while (connected.get(temp[0]).equals(dev_id)) {
-                    out.writeObject("NOK-DEVID");
-                    out.flush();
-                    dev_id = (String) in.readObject();
-                }
-
-                connected.put(temp[0], dev_id);
-
-                out.writeObject("OK-DEVID");
-                out.flush();
-            }
 
             // Grande switch case
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
+        if (!userCredentials.containsKey(user)) {
+            //Novo user
+
+            LinkedList<String> newUserDevIds = new LinkedList<>();
+
+            //Escrever no credentials file
+            FileWriter myWriter = new FileWriter("userCredentials.txt");
+            myWriter.write(login);
+            myWriter.close();
+            userCredentials.put(user, password);
+
+            out.writeObject("OK-NEW-USER");
+            out.flush();
+
+            connected.put(user, newUserDevIds);
+        }
+        else
+        {
+            //User existe
+
+            //Auth password
+            String currPass = (String) in.readObject();
+            while (!userCredentials.get(user).equals(currPass)) {
+                out.writeObject("WRONG-PWD");
+                out.flush();
+                currPass = (String) in.readObject();
+            }
+
+            out.writeObject("OK-USER");
+            out.flush();
+        }
+    }
+
+    private static void handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
+        while (connected.get(user).contains(dev_id)) {
+            out.writeObject("NOK-DEVID");
+            out.flush();
+            dev_id = (String) in.readObject();
+        }
+
+        LinkedList<String> appendUserDevId = connected.get(user);
+        appendUserDevId.add(dev_id);
+
+        connected.put(user, appendUserDevId);
+
+        out.writeObject("OK-DEVID");
+        out.flush();
+    }
+
+    private static void handleFileSize() {
+        
     }
 
     private static class Domain {
