@@ -72,7 +72,28 @@ public class IoTServer {
 
 
             // Grande switch case
+            String request = (String) in.readObject();
+            String[] reqSplit = login.split(" ");
 
+            switch(reqSplit[0]){    
+                case "CREATE":    
+                    //Create
+                case "ADD":    
+                    //Add
+                case "RD":
+                    //Rd
+                case "ET":
+                    //Et
+                case "EI":
+                    //Ei
+                case "RT":
+                    //Rt
+                case "RI":
+                    //Ri
+                default:     
+                  out.writeObject("Pedido Invalido!");
+                  out.flush();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
