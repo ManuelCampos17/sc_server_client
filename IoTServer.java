@@ -28,9 +28,6 @@ public class IoTServer {
     //App name e size
     private static File clientProgramData;
 
-    //Domain names e devices associados, tambem user read perms por domain
-    private static File domainsAndPermsFile;
-
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
         if (args.length > 0) {
@@ -96,7 +93,7 @@ public class IoTServer {
 
                 //Handle Auth Dev-id
                 String dev_id = (String) in.readObject();
-                handleDevId(in, out, temp[0], dev_id);
+                String currDevId = handleDevId(in, out, temp[0], dev_id);
 
                 //Handle file size
                 String programInfo = (String) in.readObject();
@@ -148,13 +145,14 @@ public class IoTServer {
                             break;
                         }
                         
-                        Domain selectedDom = null;
+                        Domain selectedDomCR = null;
                         boolean domainExists = false;
 
                         for (Domain dom : domains) {
                             if (dom.getName().equals(reqSplit[2])) {
                                 domainExists = true;
-                                selectedDom = dom;
+                                selectedDomCR = dom;
+                                domains.remove(dom);
                             }
                         }
 
@@ -164,13 +162,42 @@ public class IoTServer {
                             break;
                         }
 
-                        if (!selectedDom.getCreator().equals(temp[0])) {
+                        if (!selectedDomCR.getCreator().equals(temp[0])) {
                             out.writeObject("NOPERM");
+                            out.flush();
+                            domains.add(selectedDomCR);
+                            break;
+                        }
+
+                        selectedDomCR.addUser(reqSplit[1]);
+                        domains.add(selectedDomCR);
+                    case "RD":
+                        Domain selectedDomRD = null;
+                        boolean exists = false;
+
+                        for (Domain dom : domains) {
+                            if (dom.getName().equals(reqSplit[2])) {
+                                exists = true;
+                                selectedDomRD = dom;
+                                domains.remove(dom);
+                            }
+                        }
+
+                        if (!exists) {
+                            out.writeObject("NODM");
                             out.flush();
                             break;
                         }
-                    case "RD":
-                        //Rd
+
+                        if (!selectedDomRD.getUsers().contains(temp[0])) {
+                            out.writeObject("NOPERM");
+                            out.flush();
+                            domains.add(selectedDomRD);
+                            break;
+                        }
+
+                        selectedDomRD.addDevice(currDevId);;
+                        domains.add(selectedDomRD);
                     case "ET":
                         //Et
                     case "EI":
@@ -222,7 +249,7 @@ public class IoTServer {
             }
         }
 
-        private static void handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
+        private static String handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
             while (connected.get(user).contains(dev_id)) {
                 out.writeObject("NOK-DEVID");
                 out.flush();
@@ -236,6 +263,8 @@ public class IoTServer {
 
             out.writeObject("OK-DEVID");
             out.flush();
+
+            return dev_id;
         }
 
         private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progInfo) {
@@ -272,12 +301,14 @@ public class IoTServer {
         private String name;
         private String creator;
         private LinkedList<String> devices;
+        private LinkedList<String> users;
         private Map<String, Boolean> readPerms = new HashMap<>();
 
         public Domain(String name, String creator) {
             this.name = name;
             this.creator = creator;
             this.devices = new LinkedList<String>();
+            this.users = new LinkedList<String>();
         }
 
         public String getName() {
@@ -292,12 +323,20 @@ public class IoTServer {
             return devices;
         }
 
+        public LinkedList<String> getUsers() {
+            return users;
+        }
+
         public Map<String, Boolean> getReadPermissions() {
             return readPerms;
         }
 
         public void addDevice(String devId) {
             devices.add(devId);
+        }
+
+        public void addUser(String user) {
+            users.add(user);
         }
     }
 }
