@@ -171,6 +171,9 @@ public class IoTServer {
 
                         selectedDomCR.addUser(reqSplit[1]);
                         domains.add(selectedDomCR);
+                        out.writeObject("OK");
+                        out.flush();
+                        break;
                     case "RD":
                         Domain selectedDomRD = null;
                         boolean exists = false;
@@ -198,6 +201,9 @@ public class IoTServer {
 
                         selectedDomRD.addDevice(currDevId);;
                         domains.add(selectedDomRD);
+                        out.writeObject("OK");
+                        out.flush();
+                        break;
                     case "ET":
                         //Et
                     case "EI":
