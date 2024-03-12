@@ -17,7 +17,7 @@ public class IoTServer {
     private static Map<String, String> userCredentials = new HashMap<>();
     
     //Nome do domain -> Tipo que ainda vou definir (maybe lista de users q la tao)
-    private Map<String, Domain> domains = new HashMap<>();
+    private static LinkedList<Domain> domains = new LinkedList<Domain>();
 
     //Dev-id connected
     private static Map<String, LinkedList<String>> connected = new HashMap<String, LinkedList<String>>();
@@ -113,10 +113,62 @@ public class IoTServer {
                 String[] reqSplit = request.split(" ");
 
                 switch(reqSplit[0]){    
-                    case "CREATE":    
-                        //Create
-                    case "ADD":    
-                        //Add
+                    case "CREATE":
+                        if (domains.isEmpty()) {
+                            Domain newDomain = new Domain(reqSplit[1], temp[0]);
+                            domains.add(newDomain);
+                            out.writeObject("OK");
+                            out.flush();
+                            break;
+                        }
+                        
+                        for (Domain dom : domains) {
+                            if (dom.getName().equals(reqSplit[1])) {
+                                out.writeObject("NOK");
+                                out.flush();
+                                break;
+                            }
+                        }
+
+                        Domain newDomain = new Domain(reqSplit[1], temp[0]);
+                        domains.add(newDomain);
+                        out.writeObject("OK");
+                        out.flush();
+                        break;
+                    case "ADD":
+                        if (!userCredentials.containsKey(reqSplit[1])) {
+                            out.writeObject("NOUSER");
+                            out.flush();
+                            break;
+                        }
+
+                        if (domains.isEmpty()) {
+                            out.writeObject("NODM");
+                            out.flush();
+                            break;
+                        }
+                        
+                        Domain selectedDom = null;
+                        boolean domainExists = false;
+
+                        for (Domain dom : domains) {
+                            if (dom.getName().equals(reqSplit[2])) {
+                                domainExists = true;
+                                selectedDom = dom;
+                            }
+                        }
+
+                        if (!domainExists) {
+                            out.writeObject("NODM");
+                            out.flush();
+                            break;
+                        }
+
+                        if (!selectedDom.getCreator().equals(temp[0])) {
+                            out.writeObject("NOPERM");
+                            out.flush();
+                            break;
+                        }
                     case "RD":
                         //Rd
                     case "ET":
@@ -128,8 +180,8 @@ public class IoTServer {
                     case "RI":
                         //Ri
                     default:     
-                    out.writeObject("Pedido Invalido!");
-                    out.flush();
+                        out.writeObject("Pedido Invalido!");
+                        out.flush();
                 }
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
@@ -218,19 +270,34 @@ public class IoTServer {
 
     private static class Domain {
         private String name;
+        private String creator;
+        private LinkedList<String> devices;
         private Map<String, Boolean> readPerms = new HashMap<>();
 
-        public Domain(String name) {
+        public Domain(String name, String creator) {
             this.name = name;
+            this.creator = creator;
+            this.devices = new LinkedList<String>();
         }
 
         public String getName() {
             return name;
         }
 
+        public String getCreator() {
+            return creator;
+        }
+
+        public LinkedList<String> getDevices() {
+            return devices;
+        }
+
         public Map<String, Boolean> getReadPermissions() {
-            return null;
-            // return readPermissions;
+            return readPerms;
+        }
+
+        public void addDevice(String devId) {
+            devices.add(devId);
         }
     }
 }
