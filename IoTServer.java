@@ -22,16 +22,43 @@ public class IoTServer {
     //Dev-id connected
     private static Map<String, LinkedList<String>> connected = new HashMap<String, LinkedList<String>>();
 
+    //Usernames e passwords
+    private static File userFile;
+
+    //App name e size
+    private static File clientProgramData;
+
+    //Domain names e devices associados, tambem user read perms por domain
+    private static File domainsAndPermsFile;
+
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
         if (args.length > 0) {
             port = Integer.parseInt(args[0]);
         }
 
+        //Criar size e nome do client executable
+        clientProgramData = new File("clientProgram.txt");
+        try {
+            if (clientProgramData.createNewFile()) {
+                System.out.println("Client file data created");
+            } else 
+            {
+                System.out.println("Client file data already exists.");
+            }
+
+            //Escrever nome e size
+            BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
+            myWriterClient.write("IoTDevice:13000");
+            myWriterClient.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server initialized on port: " + port);
 
-            File userFile = new File("userCredentials.txt");
+            userFile = new File("userCredentials.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
             } else {
@@ -69,11 +96,18 @@ public class IoTServer {
             handleDevId(in, out, temp[0], dev_id);
 
             //Handle file size
+            String programInfo = (String) in.readObject();
+            boolean fileCheck = handleFileSize(in, out, programInfo);
 
+            if (!fileCheck) {
+                out.close();
+                in.close();
+                clientSocket.close();
+            }
 
             // Grande switch case
             String request = (String) in.readObject();
-            String[] reqSplit = login.split(" ");
+            String[] reqSplit = request.split(" ");
 
             switch(reqSplit[0]){    
                 case "CREATE":    
@@ -106,9 +140,9 @@ public class IoTServer {
             LinkedList<String> newUserDevIds = new LinkedList<>();
 
             //Escrever no credentials file
-            FileWriter myWriter = new FileWriter("userCredentials.txt");
-            myWriter.write(login);
-            myWriter.close();
+            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+            myWriterUsers.write(login);
+            myWriterUsers.close();
             userCredentials.put(user, password);
 
             out.writeObject("OK-NEW-USER");
@@ -149,8 +183,33 @@ public class IoTServer {
         out.flush();
     }
 
-    private static void handleFileSize() {
-        
+    private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progInfo) {
+        boolean retval = false;
+
+        try {
+            BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
+            String line = progInfoReader.readLine();
+            String[] serverProgDataSplit = line.split(":");
+            String[] userProgDataSplit = progInfo.split(":");
+
+            if ((serverProgDataSplit[0].equals(userProgDataSplit[0])) && (Integer.parseInt(serverProgDataSplit[0]) == Integer.parseInt(userProgDataSplit[0]))) {
+                out.writeObject("OK-TESTED");
+                out.flush();
+                progInfoReader.close();
+                retval = true;
+            }
+            else 
+            {
+                out.writeObject("NOK-TESTED");
+                out.flush();
+                progInfoReader.close();
+                retval = false;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return retval;
     }
 
     private static class Domain {
