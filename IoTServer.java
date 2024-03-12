@@ -55,7 +55,7 @@ public class IoTServer {
             e.printStackTrace();
         }
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+        try (ServerSocket srvSocket = new ServerSocket(port)) {
             System.out.println("Server initialized on port: " + port);
 
             userFile = new File("userCredentials.txt");
@@ -65,151 +65,155 @@ public class IoTServer {
                 System.out.println("Users file already exists.");
             }
 
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                new Thread(() -> {
-                    try {
-                        handleClient(clientSocket);
-                    } catch (ClassNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                }).start();
+            while (true){
+                Socket cliSocket = srvSocket.accept();
+                ClientHandler ch = new ClientHandler(cliSocket);
+                new Thread(ch).start();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private static void handleClient(Socket clientSocket) throws ClassNotFoundException {
-        try (
-            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-            ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
-        ) {
-            String login = (String) in.readObject();
-            String[] temp = login.split(":");
-
-            //Handle Auth
-            handleAuth(in, out, login, temp[0], temp[1]);
-
-            //Handle Auth Dev-id
-            String dev_id = (String) in.readObject();
-            handleDevId(in, out, temp[0], dev_id);
-
-            //Handle file size
-            String programInfo = (String) in.readObject();
-            boolean fileCheck = handleFileSize(in, out, programInfo);
-
-            if (!fileCheck) {
-                out.close();
-                in.close();
-                clientSocket.close();
-            }
-
-            // Grande switch case
-            String request = (String) in.readObject();
-            String[] reqSplit = request.split(" ");
-
-            switch(reqSplit[0]){    
-                case "CREATE":    
-                    //Create
-                case "ADD":    
-                    //Add
-                case "RD":
-                    //Rd
-                case "ET":
-                    //Et
-                case "EI":
-                    //Ei
-                case "RT":
-                    //Rt
-                case "RI":
-                    //Ri
-                default:     
-                  out.writeObject("Pedido Invalido!");
-                  out.flush();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+    static class ClientHandler implements Runnable {
+        private Socket clientSocket;
+        
+        public ClientHandler(Socket clientSocket) {
+            this.clientSocket = clientSocket;
         }
-    }
 
-    private static void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
-        if (!userCredentials.containsKey(user)) {
-            //Novo user
+        @Override
+        public void run() {
+            try (
+                ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+            ) {
+                String login = (String) in.readObject();
+                String[] temp = login.split(":");
 
-            LinkedList<String> newUserDevIds = new LinkedList<>();
+                //Handle Auth
+                handleAuth(in, out, login, temp[0], temp[1]);
 
-            //Escrever no credentials file
-            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
-            myWriterUsers.write(login);
-            myWriterUsers.close();
-            userCredentials.put(user, password);
+                //Handle Auth Dev-id
+                String dev_id = (String) in.readObject();
+                handleDevId(in, out, temp[0], dev_id);
 
-            out.writeObject("OK-NEW-USER");
-            out.flush();
+                //Handle file size
+                String programInfo = (String) in.readObject();
+                boolean fileCheck = handleFileSize(in, out, programInfo);
 
-            connected.put(user, newUserDevIds);
+                if (!fileCheck) {
+                    out.close();
+                    in.close();
+                    clientSocket.close();
+                }
+
+                // Grande switch case
+                String request = (String) in.readObject();
+                String[] reqSplit = request.split(" ");
+
+                switch(reqSplit[0]){    
+                    case "CREATE":    
+                        //Create
+                    case "ADD":    
+                        //Add
+                    case "RD":
+                        //Rd
+                    case "ET":
+                        //Et
+                    case "EI":
+                        //Ei
+                    case "RT":
+                        //Rt
+                    case "RI":
+                        //Ri
+                    default:     
+                    out.writeObject("Pedido Invalido!");
+                    out.flush();
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
         }
-        else
-        {
-            //User existe
 
-            //Auth password
-            String currPass = (String) in.readObject();
-            while (!userCredentials.get(user).equals(currPass)) {
-                out.writeObject("WRONG-PWD");
+        private static void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
+            if (!userCredentials.containsKey(user)) {
+                //Novo user
+
+                LinkedList<String> newUserDevIds = new LinkedList<>();
+
+                //Escrever no credentials file
+                BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                myWriterUsers.write(login);
+                myWriterUsers.close();
+                userCredentials.put(user, password);
+
+                out.writeObject("OK-NEW-USER");
                 out.flush();
-                currPass = (String) in.readObject();
+
+                connected.put(user, newUserDevIds);
             }
-
-            out.writeObject("OK-USER");
-            out.flush();
-        }
-    }
-
-    private static void handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
-        while (connected.get(user).contains(dev_id)) {
-            out.writeObject("NOK-DEVID");
-            out.flush();
-            dev_id = (String) in.readObject();
-        }
-
-        LinkedList<String> appendUserDevId = connected.get(user);
-        appendUserDevId.add(dev_id);
-
-        connected.put(user, appendUserDevId);
-
-        out.writeObject("OK-DEVID");
-        out.flush();
-    }
-
-    private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progInfo) {
-        boolean retval = false;
-
-        try {
-            BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
-            String line = progInfoReader.readLine();
-            String[] serverProgDataSplit = line.split(":");
-            String[] userProgDataSplit = progInfo.split(":");
-
-            if ((serverProgDataSplit[0].equals(userProgDataSplit[0])) && (Integer.parseInt(serverProgDataSplit[0]) == Integer.parseInt(userProgDataSplit[0]))) {
-                out.writeObject("OK-TESTED");
-                out.flush();
-                progInfoReader.close();
-                retval = true;
-            }
-            else 
+            else
             {
-                out.writeObject("NOK-TESTED");
+                //User existe
+
+                //Auth password
+                String currPass = (String) in.readObject();
+                while (!userCredentials.get(user).equals(currPass)) {
+                    out.writeObject("WRONG-PWD");
+                    out.flush();
+                    currPass = (String) in.readObject();
+                }
+
+                out.writeObject("OK-USER");
                 out.flush();
-                progInfoReader.close();
-                retval = false;
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
-        return retval;
+        private static void handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
+            while (connected.get(user).contains(dev_id)) {
+                out.writeObject("NOK-DEVID");
+                out.flush();
+                dev_id = (String) in.readObject();
+            }
+
+            LinkedList<String> appendUserDevId = connected.get(user);
+            appendUserDevId.add(dev_id);
+
+            connected.put(user, appendUserDevId);
+
+            out.writeObject("OK-DEVID");
+            out.flush();
+        }
+
+        private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progInfo) {
+            boolean retval = false;
+
+            try {
+                BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
+                String line = progInfoReader.readLine();
+                String[] serverProgDataSplit = line.split(":");
+                String[] userProgDataSplit = progInfo.split(":");
+
+                if ((serverProgDataSplit[0].equals(userProgDataSplit[0])) && (Integer.parseInt(serverProgDataSplit[0]) == Integer.parseInt(userProgDataSplit[0]))) {
+                    out.writeObject("OK-TESTED");
+                    out.flush();
+                    progInfoReader.close();
+                    retval = true;
+                }
+                else 
+                {
+                    out.writeObject("NOK-TESTED");
+                    out.flush();
+                    progInfoReader.close();
+                    retval = false;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return retval;
+        }
     }
 
     private static class Domain {
