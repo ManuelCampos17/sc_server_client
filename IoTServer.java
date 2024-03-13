@@ -243,7 +243,7 @@ public class IoTServer {
                             break;
                         }
 
-                        selectedDomRD.addDevice(currDevId);;
+                        selectedDomRD.addDevice(temp[0] + ":" + currDevId);;
                         domains.add(selectedDomRD);
 
                         //Dar replace a linha no domains file
@@ -277,7 +277,7 @@ public class IoTServer {
                         out.writeObject("OK");
                         out.flush();
 
-                        temps.put(currDevId, Float.parseFloat(reqSplit[1]));
+                        temps.put(temp[0] + ":" + currDevId, Float.parseFloat(reqSplit[1]));
                         break;
                     case "EI":
                         boolean eiCond = reqSplit[1].endsWith(".jpg");
@@ -285,6 +285,7 @@ public class IoTServer {
                         if (eiCond) {
                             out.writeObject("OK");
                             out.flush();
+                            imgs.put(temp[0] + ":" + currDevId, reqSplit[1]);
                             break;
                         }
 
@@ -330,19 +331,56 @@ public class IoTServer {
                         }
 
                         //Enviar o filesize e o file
-                        FileInputStream fin = new FileInputStream(rtFile);
-                        InputStream input = new BufferedInputStream(fin);
-                        byte[] buffer = new byte[(int)rtFile.length()];
-                        int bytesRead = input.read(buffer,0,buffer.length);
+                        FileInputStream finRT = new FileInputStream(rtFile);
+                        InputStream inputRT = new BufferedInputStream(finRT);
+                        byte[] bufferRT = new byte[(int)rtFile.length()];
+                        int bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
 
                         out.writeObject("OK");
-                        out.writeObject(bytesRead);
+                        out.writeObject(bytesReadRT);
                         out.flush();
-                        out.write(buffer);
+                        out.write(bufferRT);
                         out.flush();
                         break;
                     case "RI":
-                        //Ri
+                        String[] userDataRI = reqSplit[1].split(":");
+
+                        if (!connected.get(userDataRI[0]).contains(reqSplit[1])) {
+                            out.writeObject("NOID # esse device id não existe");
+                            out.flush();
+                            break;
+                        }
+
+                        if (!imgs.containsKey(reqSplit[1])) {
+                            out.writeObject("NODATA # nao existem dados de imagem publicados");
+                            out.flush();
+                            break;
+                        }
+
+                        for (Domain dom : domains) {
+                            if (dom.getDevices().contains(reqSplit[1])) {
+                                //Check read perms
+                                if (!dom.getUsers().contains(temp[0])) {
+                                    out.writeObject("NOPERM # sem permissoes de leitura");
+                                    out.flush();
+                                    break;
+                                }
+                            }
+                        }
+
+                        //Enviar o filesize e o file
+                        File riFile = new File(imgs.get(reqSplit[1]));
+                        FileInputStream finRI = new FileInputStream(riFile);
+                        InputStream inputRI = new BufferedInputStream(finRI);
+                        byte[] bufferRI = new byte[(int)riFile.length()];
+                        int bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
+
+                        out.writeObject("OK");
+                        out.writeObject(bytesReadRI);
+                        out.flush();
+                        out.write(bufferRI);
+                        out.flush();
+                        break;
                     default:     
                         out.writeObject("Pedido Invalido!");
                         out.flush();
