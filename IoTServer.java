@@ -64,7 +64,7 @@ public class IoTServer {
         //Criar file com info dos domains (vazio por agora)
         domainsInfo = new File("domainsInfo.txt");
         try {
-            if (clientProgramData.createNewFile()) {
+            if (domainsInfo.createNewFile()) {
                 System.out.println("Domains file created");
             } else 
             {
@@ -153,8 +153,8 @@ public class IoTServer {
                         domains.add(newDomain);
 
                         //Escrever no domains file
-                        BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("userCredentials.txt", true));
-                        myWriterDomainsCR.write(reqSplit[1] + ":" + System.getProperty("line.separator"));
+                        BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                        myWriterDomainsCR.write(reqSplit[1] + ":");
                         myWriterDomainsCR.close();
 
                         out.writeObject("OK");
@@ -162,43 +162,58 @@ public class IoTServer {
                         break;
                     case "ADD":
                         if (!userCredentials.containsKey(reqSplit[1])) {
-                            out.writeObject("NOUSER");
+                            out.writeObject("NOUSER # o utilizador nao existe");
                             out.flush();
                             break;
                         }
 
                         if (domains.isEmpty()) {
-                            out.writeObject("NODM");
+                            out.writeObject("NODM # esse dominio nao existe");
                             out.flush();
                             break;
                         }
                         
-                        Domain selectedDomCR = null;
+                        Domain selectedDomADD = null;
                         boolean domainExists = false;
 
                         for (Domain dom : domains) {
                             if (dom.getName().equals(reqSplit[2])) {
                                 domainExists = true;
-                                selectedDomCR = dom;
+                                selectedDomADD = dom;
                                 domains.remove(dom);
                             }
                         }
 
                         if (!domainExists) {
-                            out.writeObject("NODM");
+                            out.writeObject("NODM # esse dominio nao existe");
                             out.flush();
                             break;
                         }
 
-                        if (!selectedDomCR.getCreator().equals(temp[0])) {
-                            out.writeObject("NOPERM");
+                        if (!selectedDomADD.getCreator().equals(temp[0])) {
+                            out.writeObject("NOPERM # sem permissoes");
                             out.flush();
-                            domains.add(selectedDomCR);
+                            domains.add(selectedDomADD);
                             break;
                         }
 
-                        selectedDomCR.addUser(reqSplit[1]);
-                        domains.add(selectedDomCR);
+                        deleteLineDomain(reqSplit[1] + " (Users)");
+
+                        selectedDomADD.addUser(reqSplit[1]);
+                        domains.add(selectedDomADD);
+
+                        //Escrever no domains file a nova linha com devices updated
+                        BufferedWriter myWriterDomainsADD = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                        LinkedList<String> usersDomADD = selectedDomADD.getUsers();
+
+                        StringBuilder stringBuilderADD = new StringBuilder();
+
+                        for (String s : usersDomADD) {
+                            stringBuilderADD.append(s + " ");
+                        }
+
+                        myWriterDomainsADD.write(reqSplit[1] + " (Users):" + stringBuilderADD.toString() + System.getProperty("line.separator"));
+                        myWriterDomainsADD.close();
 
                         out.writeObject("OK");
                         out.flush();
@@ -216,13 +231,13 @@ public class IoTServer {
                         }
 
                         if (!exists) {
-                            out.writeObject("NODM");
+                            out.writeObject("NODM # esse dominio nao existe");
                             out.flush();
                             break;
                         }
 
                         if (!selectedDomRD.getUsers().contains(temp[0])) {
-                            out.writeObject("NOPERM");
+                            out.writeObject("NOPERM # sem permissoes");
                             out.flush();
                             domains.add(selectedDomRD);
                             break;
@@ -232,10 +247,10 @@ public class IoTServer {
                         domains.add(selectedDomRD);
 
                         //Dar replace a linha no domains file
-                        deleteLineDomain(reqSplit[1]);
+                        deleteLineDomain(reqSplit[1] + " (Devices)");
 
                         //Escrever no domains file a nova linha com devices updated
-                        BufferedWriter myWriterDomainsRD = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                        BufferedWriter myWriterDomainsRD = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                         LinkedList<String> selectedDomDevicesRD = selectedDomRD.getDevices();
 
                         StringBuilder stringBuilderRD = new StringBuilder();
@@ -244,7 +259,7 @@ public class IoTServer {
                             stringBuilderRD.append(s + " ");
                         }
 
-                        myWriterDomainsRD.write(reqSplit[1] + ":" + stringBuilderRD.toString() + System.getProperty("line.separator"));
+                        myWriterDomainsRD.write(reqSplit[1] + " (Devices):" + stringBuilderRD.toString() + System.getProperty("line.separator"));
                         myWriterDomainsRD.close();
 
                         out.writeObject("OK");
@@ -277,7 +292,55 @@ public class IoTServer {
                         out.flush();
                         break;
                     case "RT":
-                        //Rt
+                        //Primeiro criar o file para enviar
+                        File rtFile = new File("tempFile.txt");
+                        BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
+                        Domain rtDomain = null;
+
+                        for (Domain dom : domains) {
+                            
+                            if (dom.getName().equals(reqSplit[1])) {
+                                //Check read perms
+                                if (!dom.getUsers().contains(temp[0])) {
+                                    out.writeObject("NOPERM # sem permissoes de leitura");
+                                    out.flush();
+                                    break;
+                                }
+
+                                rtDomain = dom;
+                            }
+                        }
+
+                        if (rtDomain == null) {
+                            out.writeObject("NODM # esse dominio nao existe");
+                            out.flush();
+                            break;
+                        }
+
+                        if (temps.isEmpty()) {
+                            out.writeObject("NODATA # nao existem dados de temperatura publicados");
+                            out.flush();
+                            break;
+                        }
+
+                        for (String currId : rtDomain.getDevices()) {
+                            if (temps.containsKey(currId)) {
+                                rtFileWriter.write(currId + ":" + temps.get(currId) + " ");
+                            }
+                        }
+
+                        //Enviar o filesize e o file
+                        FileInputStream fin = new FileInputStream(rtFile);
+                        InputStream input = new BufferedInputStream(fin);
+                        byte[] buffer = new byte[(int)rtFile.length()];
+                        int bytesRead = input.read(buffer,0,buffer.length);
+
+                        out.writeObject("OK");
+                        out.writeObject(bytesRead);
+                        out.flush();
+                        out.write(buffer);
+                        out.flush();
+                        break;
                     case "RI":
                         //Ri
                     default:     
@@ -310,6 +373,11 @@ public class IoTServer {
 
                 writer.close();
                 reader.close();
+
+                tempFile.renameTo(new File("domainsInfo.txt"));
+                domainsInfo.delete();
+                domainsInfo = tempFile;
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -402,7 +470,6 @@ public class IoTServer {
         private String creator;
         private LinkedList<String> devices;
         private LinkedList<String> users;
-        private Map<String, Boolean> readPerms = new HashMap<>();
 
         public Domain(String name, String creator) {
             this.name = name;
@@ -425,10 +492,6 @@ public class IoTServer {
 
         public LinkedList<String> getUsers() {
             return users;
-        }
-
-        public Map<String, Boolean> getReadPermissions() {
-            return readPerms;
         }
 
         public void addDevice(String devId) {
