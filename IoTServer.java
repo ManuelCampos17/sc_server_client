@@ -22,11 +22,20 @@ public class IoTServer {
     //Dev-id connected
     private static Map<String, LinkedList<String>> connected = new HashMap<String, LinkedList<String>>();
 
+    //Last device temp
+    private static Map<String, Float> temps = new HashMap<String, Float>();
+
+    //Last device img
+    private static Map<String, String> imgs = new HashMap<String, String>();
+
     //Usernames e passwords
     private static File userFile;
 
     //App name e size
     private static File clientProgramData;
+
+    //Domain file
+    private static File domainsInfo;
 
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
@@ -48,6 +57,19 @@ public class IoTServer {
             BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
             myWriterClient.write("IoTDevice:13000");
             myWriterClient.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        //Criar file com info dos domains (vazio por agora)
+        domainsInfo = new File("domainsInfo.txt");
+        try {
+            if (clientProgramData.createNewFile()) {
+                System.out.println("Domains file created");
+            } else 
+            {
+                System.out.println("Domains file already exists.");
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -129,6 +151,12 @@ public class IoTServer {
 
                         Domain newDomain = new Domain(reqSplit[1], temp[0]);
                         domains.add(newDomain);
+
+                        //Escrever no domains file
+                        BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                        myWriterDomainsCR.write(reqSplit[1] + ":" + System.getProperty("line.separator"));
+                        myWriterDomainsCR.close();
+
                         out.writeObject("OK");
                         out.flush();
                         break;
@@ -171,6 +199,7 @@ public class IoTServer {
 
                         selectedDomCR.addUser(reqSplit[1]);
                         domains.add(selectedDomCR);
+
                         out.writeObject("OK");
                         out.flush();
                         break;
@@ -201,13 +230,52 @@ public class IoTServer {
 
                         selectedDomRD.addDevice(currDevId);;
                         domains.add(selectedDomRD);
+
+                        //Dar replace a linha no domains file
+                        deleteLineDomain(reqSplit[1]);
+
+                        //Escrever no domains file a nova linha com devices updated
+                        BufferedWriter myWriterDomainsRD = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                        LinkedList<String> selectedDomDevicesRD = selectedDomRD.getDevices();
+
+                        StringBuilder stringBuilderRD = new StringBuilder();
+
+                        for (String s : selectedDomDevicesRD) {
+                            stringBuilderRD.append(s + " ");
+                        }
+
+                        myWriterDomainsRD.write(reqSplit[1] + ":" + stringBuilderRD.toString() + System.getProperty("line.separator"));
+                        myWriterDomainsRD.close();
+
                         out.writeObject("OK");
                         out.flush();
                         break;
                     case "ET":
-                        //Et
+                        try {
+                            Float.parseFloat(reqSplit[1]);
+                        } catch(NumberFormatException e) {
+                            out.writeObject("NOK");
+                            out.flush();
+                            break;
+                        }
+                        
+                        out.writeObject("OK");
+                        out.flush();
+
+                        temps.put(currDevId, Float.parseFloat(reqSplit[1]));
+                        break;
                     case "EI":
-                        //Ei
+                        boolean eiCond = reqSplit[1].endsWith(".jpg");
+
+                        if (eiCond) {
+                            out.writeObject("OK");
+                            out.flush();
+                            break;
+                        }
+
+                        out.writeObject("NOK");
+                        out.flush();
+                        break;
                     case "RT":
                         //Rt
                     case "RI":
@@ -221,6 +289,32 @@ public class IoTServer {
             }
         }
 
+        private static void deleteLineDomain(String domainName) {
+            try {
+                File tempFile = new File("myTempFile.txt");
+                BufferedReader reader = new BufferedReader(new FileReader("domainsInfo.txt"));
+                BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
+
+                String lineToRemove = domainName;
+                String currentLine;
+
+                while((currentLine = reader.readLine()) != null) {
+                    String domainNameInFile = currentLine.split(":")[0];
+
+                    if(domainNameInFile.equals(lineToRemove)){
+                        continue;
+                    }
+
+                    writer.write(currentLine + System.getProperty("line.separator"));
+                }
+
+                writer.close();
+                reader.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         private static void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
             if (!userCredentials.containsKey(user)) {
                 //Novo user
@@ -229,7 +323,7 @@ public class IoTServer {
 
                 //Escrever no credentials file
                 BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
-                myWriterUsers.write(login);
+                myWriterUsers.write(login + System.getProperty("line.separator"));
                 myWriterUsers.close();
                 userCredentials.put(user, password);
 
