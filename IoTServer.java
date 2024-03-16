@@ -20,7 +20,7 @@ public class IoTServer {
     private static LinkedList<Domain> domains = new LinkedList<Domain>();
 
     //Dev-id connected
-    private static Map<String, LinkedList<String>> connected = new HashMap<String, LinkedList<String>>();
+    private static Map<String, LinkedList<Integer>> connected = new HashMap<String, LinkedList<Integer>>();
 
     //Last device temp
     private static Map<String, Float> temps = new HashMap<String, Float>();
@@ -48,10 +48,10 @@ public class IoTServer {
         try {
             if (clientProgramData.createNewFile()) {
                 System.out.println("Client file data created");
-                
+
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice:13000");
+                myWriterClient.write("IoTDevice.class:6381");
                 myWriterClient.close();
             } else 
             {
@@ -82,6 +82,84 @@ public class IoTServer {
                 System.out.println("Users file created");
             } else {
                 System.out.println("Users file already exists.");
+            }
+
+            //Ir buscar as credentials que ja estao no file
+            Map<String, String> users = new HashMap<String, String>();
+            try {
+                BufferedReader rb = new BufferedReader(new FileReader("userCredentials.txt"));
+                String line = rb.readLine();
+
+                while (line != null){
+                    String[] user = line.split(":");
+                    users.put(user[0], user[1]);
+                    line = rb.readLine();
+                }
+
+                rb.close();
+                userCredentials = users;
+            } catch (Exception e) {
+                System.out.println("Error: " + e);
+            }
+
+            //Ir buscar os dominios que ja estao no file
+            try {
+                BufferedReader rbDevices = new BufferedReader(new FileReader("userCredentials.txt"));
+                String lineDevices = rbDevices.readLine();
+                Map<String, LinkedList<String>> devicesListByDomain = new HashMap<String, LinkedList<String>>();
+
+                while (lineDevices != null){
+                    String[] dom = lineDevices.split(":");
+                    String[] domType = dom[0].split(" ");
+
+                    if (domType[1].equals("(Devices)")) {
+                        LinkedList<String> devices = new LinkedList<String>();
+
+                        for (String dev : dom[1].split(" ")) {
+                            devices.add(dev);
+                        }
+
+                        devicesListByDomain.put(domType[0], devices);
+                    }
+
+                    lineDevices = rbDevices.readLine();
+                }
+
+                rbDevices.close();
+
+                LinkedList<String> domainsList = new LinkedList<String>();
+
+                BufferedReader rbUsers = new BufferedReader(new FileReader("userCredentials.txt"));
+                String lineUsers = rbUsers.readLine();
+                Map<String, LinkedList<String>> usersListByDomain = new HashMap<String, LinkedList<String>>();
+
+                while (lineUsers != null){
+                    String[] dom = lineUsers.split(":");
+                    String[] domType = dom[0].split(" ");
+
+                    if (domType[1].equals("(Users)")) {
+                        LinkedList<String> usersSplit = new LinkedList<String>();
+
+                        for (String us : dom[1].split(" ")) {
+                            usersSplit.add(us);
+                        }
+
+                        usersListByDomain.put(domType[0], usersSplit);
+                        domainsList.add(domType[0]);
+                    }
+
+                    lineUsers = rbUsers.readLine();
+                }
+
+                for (String dom : domainsList) {
+                    Domain currDom = new Domain(dom, usersListByDomain.get(dom).get(0), devicesListByDomain.get(dom), usersListByDomain.get(dom));
+                    domains.add(currDom);
+                }
+
+                rbUsers.close();
+
+            } catch (Exception e) {
+                System.out.println("Error: " + e);
             }
 
             while (true){
@@ -115,8 +193,8 @@ public class IoTServer {
                 handleAuth(in, out, login, temp[0], temp[1]);
 
                 //Handle Auth Dev-id
-                String dev_id = (String) in.readObject();
-                String currDevId = handleDevId(in, out, temp[0], dev_id);
+                int dev_id = (int) in.readObject();
+                int currDevId = handleDevId(in, out, temp[0], dev_id);
 
                 //Handle file size
                 String programName = (String) in.readObject();
@@ -127,6 +205,8 @@ public class IoTServer {
                     out.close();
                     in.close();
                     clientSocket.close();
+                    System.out.println("User " + temp[0] + ":" + currDevId + " disconnected.");
+                    return;
                 }
 
                 // Grande switch case
@@ -138,6 +218,12 @@ public class IoTServer {
                         if (domains.isEmpty()) {
                             Domain newDomain = new Domain(reqSplit[1], temp[0]);
                             domains.add(newDomain);
+
+                            //Escrever no domains file
+                            BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                            myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0]);
+                            myWriterDomainsCR.close();
+
                             out.writeObject("OK");
                             out.flush();
                             break;
@@ -156,7 +242,8 @@ public class IoTServer {
 
                         //Escrever no domains file
                         BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                        myWriterDomainsCR.write(reqSplit[1] + ":");
+                        //O primeiro user é o creator
+                        myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0]);
                         myWriterDomainsCR.close();
 
                         out.writeObject("OK");
@@ -427,7 +514,7 @@ public class IoTServer {
             if (!userCredentials.containsKey(user)) {
                 //Novo user
 
-                LinkedList<String> newUserDevIds = new LinkedList<>();
+                LinkedList<Integer> newUserDevIds = new LinkedList<>();
 
                 //Escrever no credentials file
                 BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
@@ -457,21 +544,21 @@ public class IoTServer {
             }
         }
 
-        private static String handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
+        private static int handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, int dev_id) throws IOException, ClassNotFoundException {
             while (connected.containsKey(user) && connected.get(user).contains(dev_id)) {
                 out.writeObject("NOK-DEVID");
                 out.flush();
-                dev_id = (String) in.readObject();
+                dev_id = (int) in.readObject();
             }
 
             if (connected.containsKey(user)) {
-                LinkedList<String> appendUserDevId = connected.get(user);
+                LinkedList<Integer> appendUserDevId = connected.get(user);
                 appendUserDevId.add(dev_id);
                 connected.put(user, appendUserDevId);
             }
             else 
             {
-                LinkedList<String> appendUserDevIdEmpty = new LinkedList<String>();
+                LinkedList<Integer> appendUserDevIdEmpty = new LinkedList<Integer>();
                 appendUserDevIdEmpty.add(dev_id);
                 connected.put(user, appendUserDevIdEmpty);
             }
@@ -522,6 +609,13 @@ public class IoTServer {
             this.creator = creator;
             this.devices = new LinkedList<String>();
             this.users = new LinkedList<String>();
+        }
+
+        public Domain(String name, String creator, LinkedList<String> devs, LinkedList<String> users) {
+            this.name = name;
+            this.creator = creator;
+            this.devices = devs;
+            this.users = users;
         }
 
         public String getName() {

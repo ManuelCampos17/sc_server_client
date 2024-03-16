@@ -110,13 +110,14 @@ public class IoTDevice {
             out.flush();
             out.writeObject(bytesRd);
             out.flush();
-            System.out.println("File Verification: " + flName + ":" + "bytesRd" +" sent to server!");
+            System.out.println("File Verification: " + flName + ":" + bytesRd +" sent to server!");
 
             // Receber a resposta do servidor
             String srvResponse = (String) in.readObject();
 
             if (srvResponse.equals("NOK-TESTED")) {
                 System.out.println("File not tested");
+                clientSocket.close();
                 System.exit(1);
             } else {
                 System.out.println("File tested");
@@ -145,8 +146,7 @@ public class IoTDevice {
                         continue;
                     } else {
                         String domainName = parts[1];
-                        out.writeObject("CREATE");
-                        out.writeObject(domainName);
+                        out.writeObject("CREATE " + domainName);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
