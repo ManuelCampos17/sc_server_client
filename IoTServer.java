@@ -118,8 +118,9 @@ public class IoTServer {
                 String currDevId = handleDevId(in, out, temp[0], dev_id);
 
                 //Handle file size
-                String programInfo = (String) in.readObject();
-                boolean fileCheck = handleFileSize(in, out, programInfo);
+                String programName = (String) in.readObject();
+                long programSize = (long) in.readObject();
+                boolean fileCheck = handleFileSize(in, out, programName, programSize);
 
                 if (!fileCheck) {
                     out.close();
@@ -443,7 +444,7 @@ public class IoTServer {
                 //User existe
 
                 //Auth password
-                String currPass = (String) in.readObject();
+                String currPass = password;
                 while (!userCredentials.get(user).equals(currPass)) {
                     out.writeObject("WRONG-PWD");
                     out.flush();
@@ -456,16 +457,23 @@ public class IoTServer {
         }
 
         private static String handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, String dev_id) throws IOException, ClassNotFoundException {
-            while (connected.get(user).contains(dev_id)) {
+            while (connected.containsKey(user) && connected.get(user).contains(dev_id)) {
                 out.writeObject("NOK-DEVID");
                 out.flush();
                 dev_id = (String) in.readObject();
             }
 
-            LinkedList<String> appendUserDevId = connected.get(user);
-            appendUserDevId.add(dev_id);
-
-            connected.put(user, appendUserDevId);
+            if (connected.containsKey(user)) {
+                LinkedList<String> appendUserDevId = connected.get(user);
+                appendUserDevId.add(dev_id);
+                connected.put(user, appendUserDevId);
+            }
+            else 
+            {
+                LinkedList<String> appendUserDevIdEmpty = new LinkedList<String>();
+                appendUserDevIdEmpty.add(dev_id);
+                connected.put(user, appendUserDevIdEmpty);
+            }
 
             out.writeObject("OK-DEVID");
             out.flush();
@@ -473,16 +481,15 @@ public class IoTServer {
             return dev_id;
         }
 
-        private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progInfo) {
+        private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progName, long progSize) {
             boolean retval = false;
 
             try {
                 BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
                 String line = progInfoReader.readLine();
                 String[] serverProgDataSplit = line.split(":");
-                String[] userProgDataSplit = progInfo.split(":");
 
-                if ((serverProgDataSplit[0].equals(userProgDataSplit[0])) && (Integer.parseInt(serverProgDataSplit[0]) == Integer.parseInt(userProgDataSplit[0]))) {
+                if ((serverProgDataSplit[0].equals(progName)) && (Long.parseLong(serverProgDataSplit[1]) == progSize)) {
                     out.writeObject("OK-TESTED");
                     out.flush();
                     progInfoReader.close();
