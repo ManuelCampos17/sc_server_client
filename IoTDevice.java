@@ -62,6 +62,7 @@ public class IoTDevice {
 
             // Enviar a password
             out.writeObject(userId + ":" + password);
+            out.flush();
 
             String msgPass = (String) in.readObject();
 
@@ -70,7 +71,8 @@ public class IoTDevice {
                 System.out.println("Password Errada");
                 System.out.print("Insere a tua Password: ");
                 password = sc.nextLine();
-                out.writeObject(userId + ":" + password);
+                out.writeObject(password);
+                out.flush();
                 msgPass = (String) in.readObject();
             }
 
@@ -78,6 +80,7 @@ public class IoTDevice {
 
             // Enviar o devId
             out.writeObject(devId);
+            out.flush();
 
             // Receber resposta
             String msgDevId = (String) in.readObject();
@@ -87,6 +90,7 @@ public class IoTDevice {
                 System.out.print("Insere um novo Device ID: ");
                 devId = sc.nextInt();
                 out.writeObject(devId);
+                out.flush();
                 msgDevId = (String) in.readObject();
             }
 
@@ -100,12 +104,13 @@ public class IoTDevice {
             FileInputStream fis = new FileInputStream(f);
             BufferedInputStream bis = new BufferedInputStream(fis);
             byte[] bytesBuffer = new byte[flSize];
-            int bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
+            long bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
+
+            out.writeObject(flName);
+            out.flush();
             out.writeObject(bytesRd);
             out.flush();
-            out.write(bytesBuffer);
-            out.flush();
-            System.out.println("File " + flName + " sent to server");
+            System.out.println("File Verification: " + flName + ":" + "bytesRd" +" sent to server!");
 
             // Receber a resposta do servidor
             String srvResponse = (String) in.readObject();
