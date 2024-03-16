@@ -334,7 +334,7 @@ public class IoTServer {
                         FileInputStream finRT = new FileInputStream(rtFile);
                         InputStream inputRT = new BufferedInputStream(finRT);
                         byte[] bufferRT = new byte[(int)rtFile.length()];
-                        int bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
+                        long bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
 
                         out.writeObject("OK");
                         out.writeObject(bytesReadRT);
@@ -373,7 +373,7 @@ public class IoTServer {
                         FileInputStream finRI = new FileInputStream(riFile);
                         InputStream inputRI = new BufferedInputStream(finRI);
                         byte[] bufferRI = new byte[(int)riFile.length()];
-                        int bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
+                        long bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
 
                         out.writeObject("OK");
                         out.writeObject(bytesReadRI);
