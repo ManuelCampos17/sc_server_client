@@ -51,7 +51,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6381");
+                myWriterClient.write("IoTDevice.class:6390");
                 myWriterClient.close();
             } else 
             {
@@ -217,6 +217,7 @@ public class IoTServer {
                     case "CREATE":
                         if (domains.isEmpty()) {
                             Domain newDomain = new Domain(reqSplit[1], temp[0]);
+                            newDomain.addUser(temp[0]);
                             domains.add(newDomain);
 
                             //Escrever no domains file
@@ -288,6 +289,7 @@ public class IoTServer {
 
                         deleteLineDomain(reqSplit[1] + " (Users)");
 
+                        domains.remove(selectedDomADD);
                         selectedDomADD.addUser(reqSplit[1]);
                         domains.add(selectedDomADD);
 
@@ -301,7 +303,7 @@ public class IoTServer {
                             stringBuilderADD.append(s + " ");
                         }
 
-                        myWriterDomainsADD.write(reqSplit[1] + " (Users):" + stringBuilderADD.toString() + System.getProperty("line.separator"));
+                        myWriterDomainsADD.write(reqSplit[2] + " (Users):" + stringBuilderADD.toString() + System.getProperty("line.separator"));
                         myWriterDomainsADD.close();
 
                         out.writeObject("OK");
@@ -503,7 +505,7 @@ public class IoTServer {
 
                 tempFile.renameTo(new File("domainsInfo.txt"));
                 domainsInfo.delete();
-                domainsInfo = tempFile;
+                tempFile.delete();
 
             } catch (IOException e) {
                 e.printStackTrace();

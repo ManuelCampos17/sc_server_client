@@ -161,9 +161,7 @@ public class IoTDevice {
                     } else {
                         String user = parts[1];
                         String domainName = parts[2];
-                        out.writeObject("ADD");
-                        out.writeObject(user);
-                        out.writeObject(domainName);
+                        out.writeObject("ADD " + user + " " + domainName);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
