@@ -48,15 +48,15 @@ public class IoTServer {
         try {
             if (clientProgramData.createNewFile()) {
                 System.out.println("Client file data created");
+                
+                //Escrever nome e size
+                BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
+                myWriterClient.write("IoTDevice:13000");
+                myWriterClient.close();
             } else 
             {
                 System.out.println("Client file data already exists.");
             }
-
-            //Escrever nome e size
-            BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-            myWriterClient.write("IoTDevice:13000");
-            myWriterClient.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -107,6 +107,7 @@ public class IoTServer {
                 ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
             ) {
+                System.out.println("Client connected família");
                 String login = (String) in.readObject();
                 String[] temp = login.split(":");
 
