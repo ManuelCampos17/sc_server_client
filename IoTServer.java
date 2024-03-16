@@ -104,7 +104,7 @@ public class IoTServer {
 
             //Ir buscar os dominios que ja estao no file
             try {
-                BufferedReader rbDevices = new BufferedReader(new FileReader("userCredentials.txt"));
+                BufferedReader rbDevices = new BufferedReader(new FileReader("domainsInfo.txt"));
                 String lineDevices = rbDevices.readLine();
                 Map<String, LinkedList<String>> devicesListByDomain = new HashMap<String, LinkedList<String>>();
 
@@ -129,7 +129,7 @@ public class IoTServer {
 
                 LinkedList<String> domainsList = new LinkedList<String>();
 
-                BufferedReader rbUsers = new BufferedReader(new FileReader("userCredentials.txt"));
+                BufferedReader rbUsers = new BufferedReader(new FileReader("domainsInfo.txt"));
                 String lineUsers = rbUsers.readLine();
                 Map<String, LinkedList<String>> usersListByDomain = new HashMap<String, LinkedList<String>>();
 
