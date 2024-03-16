@@ -203,9 +203,9 @@ public class IoTDevice {
                     } else {
                         File file = new File(parts[1]);
                         byte[] buffer = new byte[(int) file.length()];
-                        in = new FileInputStream(file);
-                        bis = new BufferedInputStream(in);
-                        int bytesRead = in.read(buffer, 0, buffer.length);
+                        FileInputStream fin = new FileInputStream(file);
+                        bis = new BufferedInputStream(fin);
+                        int bytesRead = bis.read(buffer, 0, buffer.length);
 
                         out.writeObject("EI");
                         out.writeInt(bytesRead);
@@ -230,8 +230,7 @@ public class IoTDevice {
                     System.out.println(srvResponse.split(", ")[0]); // checkar regex de separação
 
                     if (srvResponse.startsWith("OK")) {
-                        ;
-                        long fileSize = Long.parseLong(in.readObject());
+                        long fileSize = (long) in.readObject();
 
                         byte[] buffer = new byte[(int) fileSize];
 
@@ -262,7 +261,7 @@ public class IoTDevice {
                     System.out.println(srvResponse.split(" ")[0]); // checkar regex de separação
 
                     if (srvResponse.startsWith("OK")) {
-                        long fileSize = Long.parseLong(in.readObject());
+                        long fileSize = (long) in.readObject();
 
                         byte[] buffer = new byte[(int) fileSize];
 
@@ -289,15 +288,15 @@ public class IoTDevice {
             System.err.println("Error: " + e.getMessage());
         }
     }
-}
 
-public static boolean argsCheck(String[] args) {
-    if (args.length != 3) {
-        System.out.println("---------------------------------");
-        System.out.println("--Incorrect number of arguments--");
-        System.out.println("--> IoTDevice <serverAddress> <dev-id> <user-id> <--");
-        System.out.println("---------------------------------");
-        return false;
+    public static boolean argsCheck(String[] args) {
+        if (args.length != 3) {
+            System.out.println("---------------------------------");
+            System.out.println("--Incorrect number of arguments--");
+            System.out.println("--> IoTDevice <serverAddress> <dev-id> <user-id> <--");
+            System.out.println("---------------------------------");
+            return false;
+        }
+        return true;
     }
-    return true;
 }
