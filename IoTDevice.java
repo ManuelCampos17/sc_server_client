@@ -130,7 +130,7 @@ public class IoTDevice {
             while (true) {
 
                 System.out.println("Enter command:");
-                String command = scanner.nextLine();
+                String command = sc.nextLine();
 
                 if (command.startsWith("CREATE")) {
                     String[] parts = command.split(" ");
@@ -144,7 +144,7 @@ public class IoTDevice {
                         out.writeObject(domainName);
                         out.flush();
                     }
-                    srvResponse = in.readObject();
+                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("ADD")) {
@@ -161,7 +161,7 @@ public class IoTDevice {
                         out.writeObject(domainName);
                         out.flush();
                     }
-                    srvResponse = in.readObject();
+                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RD")) {
@@ -176,7 +176,7 @@ public class IoTDevice {
                         out.writeObject(domainName);
                         out.flush();
                     }
-                    srvResponse = in.readObject();
+                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("ET")) {
@@ -191,7 +191,7 @@ public class IoTDevice {
                         out.writeFloat(temperature);
                         out.flush();
                     }
-                    srvResponse = in.readObject();
+                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("EI")) {
@@ -212,7 +212,7 @@ public class IoTDevice {
                         out.write(buffer, 0, bytesRead);
                         out.flush();
                     }
-                    srvResponse = in.readObject();
+                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RT")) { // print("OK" + " " + fileSize + " " + conteudo)
