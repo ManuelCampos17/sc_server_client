@@ -226,6 +226,7 @@ public class IoTServer {
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                                 myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                                myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
 
                                 out.writeObject("OK");
@@ -249,8 +250,8 @@ public class IoTServer {
                             //Escrever no domains file
                             BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                             //O primeiro user é o creator
-                            myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0]);
-                            myWriterDomainsCR.write(reqSplit[1] + " (Devices):");
+                            myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                            myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                             myWriterDomainsCR.close();
 
                             out.writeObject("OK");
