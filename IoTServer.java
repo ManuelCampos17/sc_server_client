@@ -208,7 +208,9 @@ public class IoTServer {
                     System.out.println("User " + temp[0] + ":" + currDevId + " disconnected.");
                     return;
                 }
+                
 
+                // Fazer varias operacoes
                 while (true){
                     // Grande switch case
                     String request = (String) in.readObject();
