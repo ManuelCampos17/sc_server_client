@@ -225,7 +225,7 @@ public class IoTServer {
 
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0]);
+                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
 
                                 out.writeObject("OK");
@@ -242,12 +242,15 @@ public class IoTServer {
                             }
 
                             Domain newDomain = new Domain(reqSplit[1], temp[0]);
+                            newDomain.addUser(temp[0]);
                             domains.add(newDomain);
+                            
 
                             //Escrever no domains file
                             BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                             //O primeiro user é o creator
                             myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0]);
+                            myWriterDomainsCR.write(reqSplit[1] + " (Devices):");
                             myWriterDomainsCR.close();
 
                             out.writeObject("OK");
@@ -290,23 +293,36 @@ public class IoTServer {
                                 break;
                             }
 
-                            deleteLineDomain(reqSplit[1] + " (Users)");
+                            //Escrever no domains file a nova linha com devices updated
+
+                            LinkedList<String> keptLines = deleteLineDomain(reqSplit[2] + " (Users)");
+                            domainsInfo.delete();
+                            File newDomainsInfo = new File("domainsInfo.txt");
 
                             domains.remove(selectedDomADD);
                             selectedDomADD.addUser(reqSplit[1]);
                             domains.add(selectedDomADD);
 
-                            //Escrever no domains file a nova linha com devices updated
-                            BufferedWriter myWriterDomainsADD = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                            LinkedList<String> usersDomADD = selectedDomADD.getUsers();
+                            BufferedWriter myWriterDomainsADD = new BufferedWriter(new FileWriter(newDomainsInfo, true));
 
-                            StringBuilder stringBuilderADD = new StringBuilder();
+                            for (Domain d : domains) {
+                                LinkedList<String> usersDomADD = d.getUsers();
+                                LinkedList<String> devicesDomADD = d.getDevices();
+                                StringBuilder stringBuilderADDUsers = new StringBuilder();
+                                StringBuilder stringBuilderADDDevices = new StringBuilder();
 
-                            for (String s : usersDomADD) {
-                                stringBuilderADD.append(s + " ");
+                                for (String s : usersDomADD) {
+                                    stringBuilderADDUsers.append(s + " ");
+                                }
+
+                                for (String s : devicesDomADD) {
+                                    stringBuilderADDDevices.append(s + " ");
+                                }
+
+                                myWriterDomainsADD.write(d.getName() + " (Users):" + stringBuilderADDUsers.toString() + System.getProperty("line.separator"));
+                                myWriterDomainsADD.write(d.getName() + " (Devices):" + stringBuilderADDDevices.toString() + System.getProperty("line.separator"));
                             }
 
-                            myWriterDomainsADD.write(reqSplit[2] + " (Users):" + stringBuilderADD.toString() + System.getProperty("line.separator"));
                             myWriterDomainsADD.close();
 
                             out.writeObject("OK");
@@ -485,11 +501,10 @@ public class IoTServer {
             }
         }
 
-        private static void deleteLineDomain(String domainName) {
+        private static LinkedList<String> deleteLineDomain(String domainName) {
+            LinkedList<String> ret = new LinkedList<String>();
             try {
-                File tempFile = new File("myTempFile.txt");
                 BufferedReader reader = new BufferedReader(new FileReader("domainsInfo.txt"));
-                BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
 
                 String lineToRemove = domainName;
                 String currentLine;
@@ -501,19 +516,15 @@ public class IoTServer {
                         continue;
                     }
 
-                    writer.write(currentLine + System.getProperty("line.separator"));
+                    ret.add(currentLine);
                 }
 
-                writer.close();
                 reader.close();
-
-                tempFile.renameTo(new File("domainsInfo.txt"));
-                domainsInfo.delete();
-                tempFile.delete();
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+            return ret;
         }
 
         private static void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
