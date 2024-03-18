@@ -51,7 +51,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6390");
+                myWriterClient.write("IoTDevice.class:6283");
                 myWriterClient.close();
             } else 
             {
@@ -110,16 +110,19 @@ public class IoTServer {
 
                 while (lineDevices != null){
                     String[] dom = lineDevices.split(":");
-                    String[] domType = dom[0].split(" ");
+                    
+                    if (dom.length > 1) {
+                        String[] domType = dom[0].split(" ");
 
-                    if (domType[1].equals("(Devices)")) {
-                        LinkedList<String> devices = new LinkedList<String>();
+                        if (domType[1].equals("(Devices)")) {
+                            LinkedList<String> devices = new LinkedList<String>();
 
-                        for (String dev : dom[1].split(" ")) {
-                            devices.add(dev);
+                            for (String dev : dom[1].split(" ")) {
+                                devices.add(dev);
+                            }
+
+                            devicesListByDomain.put(domType[0], devices);
                         }
-
-                        devicesListByDomain.put(domType[0], devices);
                     }
 
                     lineDevices = rbDevices.readLine();
@@ -293,7 +296,6 @@ public class IoTServer {
                             }
 
                             domains.remove(selectedDomADD);
-
                             selectedDomADD.addUser(reqSplit[1]);
                             domains.add(selectedDomADD);
 
@@ -310,7 +312,6 @@ public class IoTServer {
                                 if (dom.getName().equals(reqSplit[1])) {
                                     exists = true;
                                     selectedDomRD = dom;
-                                    domains.remove(dom);
                                 }
                             }
 
@@ -323,10 +324,10 @@ public class IoTServer {
                             if (!selectedDomRD.getUsers().contains(temp[0])) {
                                 out.writeObject("NOPERM # sem permissoes");
                                 out.flush();
-                                domains.add(selectedDomRD);
                                 break;
                             }
 
+                            domains.remove(selectedDomRD);
                             selectedDomRD.addDevice(temp[0] + ":" + currDevId);;
                             domains.add(selectedDomRD);
                             
