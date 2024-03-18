@@ -110,7 +110,7 @@ public class IoTDevice {
             out.flush();
             out.writeObject(bytesRd);
             out.flush();
-            System.out.println("File Verification: " + flName + ":" + bytesRd +" sent to server!");
+            System.out.println("File Verification: " + flName + ":" + bytesRd + " sent to server!");
 
             // Receber a resposta do servidor
             String srvResponse = (String) in.readObject();
@@ -123,23 +123,25 @@ public class IoTDevice {
                 System.out.println("File tested");
             }
 
-            //Mostrar menu de opções
+            // Mostrar menu de opções
             System.out.println("Menu de Opções:");
             System.out.println("CREATE <dm> # Criar domínio - utilizador é Owner");
             System.out.println("ADD <user1> <dm> # Adicionar utilizador <user1> ao domínio <dm>");
             System.out.println("RD <dm> # Registar o Dispositivo atual no domínio <dm>");
             System.out.println("ET <float> # Enviar valor <float> de Temperatura para o servidor.");
             System.out.println("EI <filename.jpg> # Enviar Imagem <filename.jpg> para o servidor.");
-            System.out.println("RT <dm> # Receber as últimas medições de Temperatura de cada dispositivo do domínio <dm>, desde que o utilizador tenha permissões.");
-            System.out.println("RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
+            System.out.println(
+                    "RT <dm> # Receber as últimas medições de Temperatura de cada dispositivo do domínio <dm>, desde que o utilizador tenha permissões.");
+            System.out.println(
+                    "RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
 
             while (true) {
 
                 System.out.println("Enter command:");
                 String command = sc.nextLine();
+                String[] parts = command.split(" ");
 
                 if (command.startsWith("CREATE")) {
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
@@ -153,7 +155,6 @@ public class IoTDevice {
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("ADD")) {
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 3) {
                         System.out.println("Invalid command");
@@ -168,37 +169,38 @@ public class IoTDevice {
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RD")) {
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
                     } else {
                         String domainName = parts[1];
-                        out.writeObject("RD");
-                        out.writeObject(domainName);
+                        out.writeObject("RD" + " " + domainName);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
+                    if (srvResponse.startsWith("OK")) {
+                        System.out.println("Device Registered");
+                    } else {
+                        System.out.println(srvResponse);
+                    }
+
                 } else if (command.startsWith("ET")) {
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
                     } else {
                         float temperature = Float.parseFloat(parts[1]);
-                        out.writeObject("ET");
-                        out.writeFloat(temperature);
+                        out.writeObject("ET" + " " + temperature);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("EI")) {
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
@@ -210,7 +212,7 @@ public class IoTDevice {
                         bis = new BufferedInputStream(fin);
                         int bytesRead = bis.read(buffer, 0, buffer.length);
 
-                        out.writeObject("EI");
+                        out.writeObject("EI" + " " + parts[1]);
                         out.writeInt(bytesRead);
                         out.write(buffer, 0, bytesRead);
                         out.flush();
@@ -219,18 +221,16 @@ public class IoTDevice {
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RT")) { // print("OK" + " " + fileSize + " " + conteudo)
-                    String[] parts = command.split(" ");
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        out.writeObject("RT");
-                        out.writeObject(parts[1]);
+                        out.writeObject("RT" + " " + parts[1]);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
-                    System.out.println(srvResponse.split(", ")[0]); // checkar regex de separação
+                    System.out.println(srvResponse);
 
                     if (srvResponse.startsWith("OK")) {
                         long fileSize = (long) in.readObject();
@@ -241,7 +241,8 @@ public class IoTDevice {
                         int count;
                         while (bytesRead < fileSize) {
                             count = in.read(buffer);
-                            if (count == -1) break;
+                            if (count == -1)
+                                break;
                             bytesRead += count;
                         }
                         String fileContent = new String(buffer);
@@ -250,18 +251,15 @@ public class IoTDevice {
 
                 } else if (command.startsWith("RI")) { // print("OK" + " " + fileSize + " " + conteudo)
 
-                    String[] parts = command.split(" ");
-
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        out.writeObject("RI");
-                        out.writeObject(parts[1]);
+                        out.writeObject("RI" + " " + parts[1]);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
-                    System.out.println(srvResponse.split(" ")[0]); // checkar regex de separação
+                    System.out.println(srvResponse);
 
                     if (srvResponse.startsWith("OK")) {
                         long fileSize = (long) in.readObject();
@@ -272,7 +270,8 @@ public class IoTDevice {
                         int count;
                         while (bytesRead < fileSize) {
                             count = in.read(buffer);
-                            if (count == -1) break;
+                            if (count == -1)
+                                break;
                             bytesRead += count;
                         }
                         String fileContent = new String(buffer);
@@ -281,10 +280,7 @@ public class IoTDevice {
 
                 } else {
                     System.out.println("Invalid command");
-                    continue;
                 }
-                // Resposta do servidor
-
             }
 
         } catch (Exception e) {
