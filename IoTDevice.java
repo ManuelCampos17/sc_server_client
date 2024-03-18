@@ -111,7 +111,7 @@ public class IoTDevice {
             out.writeObject(bytesRd);
             out.flush();
             System.out.println("File Verification: " + flName + ":" + bytesRd + " sent to server!");
-
+            
             // Receber a resposta do servidor
             String srvResponse = (String) in.readObject();
 

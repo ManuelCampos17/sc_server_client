@@ -339,7 +339,7 @@ public class IoTServer {
                             boolean exists = false;
 
                             for (Domain dom : domains) {
-                                if (dom.getName().equals(reqSplit[2])) {
+                                if (dom.getName().equals(reqSplit[1])) {
                                     exists = true;
                                     selectedDomRD = dom;
                                     domains.remove(dom);
