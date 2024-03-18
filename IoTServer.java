@@ -51,7 +51,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6283");
+                myWriterClient.write("IoTDevice.class:6175");
                 myWriterClient.close();
             } else 
             {
@@ -110,7 +110,7 @@ public class IoTServer {
 
                 while (lineDevices != null){
                     String[] dom = lineDevices.split(":");
-                    
+
                     if (dom.length > 1) {
                         String[] domType = dom[0].split(" ");
 

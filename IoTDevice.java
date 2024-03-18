@@ -193,8 +193,7 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        float temperature = Float.parseFloat(parts[1]);
-                        out.writeObject("ET" + " " + temperature);
+                        out.writeObject("ET" + " " + parts[1]);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
