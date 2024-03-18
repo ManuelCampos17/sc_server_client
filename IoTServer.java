@@ -294,42 +294,10 @@ public class IoTServer {
 
                             domains.remove(selectedDomADD);
 
-                            //Escrever no domains file a nova linha com devices updated
-                            domainsInfo.delete();
-                            domainsInfo = new File("domainsInfo.txt");
-
                             selectedDomADD.addUser(reqSplit[1]);
                             domains.add(selectedDomADD);
 
-                            BufferedWriter myWriterDomainsADD = new BufferedWriter(new FileWriter(domainsInfo, true));
-
-                            for (Domain d : domains) {
-                                LinkedList<String> usersDomADD = d.getUsers();
-                                StringBuilder stringBuilderADDUsers = new StringBuilder();
-                                StringBuilder stringBuilderADDDevices = new StringBuilder();
-
-                                for (String s : usersDomADD) {
-                                    stringBuilderADDUsers.append(s + " ");
-                                }
-
-                                myWriterDomainsADD.write(d.getName() + " (Users):" + stringBuilderADDUsers.toString() + System.getProperty("line.separator"));
-
-                                if (d.getDevices() != null) {
-                                    LinkedList<String> devicesDomADD = d.getDevices();
-    
-                                    for (String s : devicesDomADD) {
-                                        stringBuilderADDDevices.append(s + " ");
-                                    }
-    
-                                    myWriterDomainsADD.write(d.getName() + " (Devices):" + stringBuilderADDDevices.toString() + System.getProperty("line.separator"));
-                                }
-                                else 
-                                {
-                                    myWriterDomainsADD.write(d.getName() + " (Devices):" + System.getProperty("line.separator"));
-                                }
-                            }
-
-                            myWriterDomainsADD.close();
+                            updateDomainsFile();
 
                             out.writeObject("OK");
                             out.flush();
@@ -361,19 +329,8 @@ public class IoTServer {
 
                             selectedDomRD.addDevice(temp[0] + ":" + currDevId);;
                             domains.add(selectedDomRD);
-
-                            //Escrever no domains file a nova linha com devices updated
-                            BufferedWriter myWriterDomainsRD = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                            LinkedList<String> selectedDomDevicesRD = selectedDomRD.getDevices();
-
-                            StringBuilder stringBuilderRD = new StringBuilder();
-
-                            for (String s : selectedDomDevicesRD) {
-                                stringBuilderRD.append(s + " ");
-                            }
-
-                            myWriterDomainsRD.write(reqSplit[1] + " (Devices):" + stringBuilderRD.toString() + System.getProperty("line.separator"));
-                            myWriterDomainsRD.close();
+                            
+                            updateDomainsFile();
 
                             out.writeObject("OK");
                             out.flush();
@@ -589,6 +546,42 @@ public class IoTServer {
             }
 
             return retval;
+        }
+
+        private static void updateDomainsFile() throws IOException {
+            
+            domainsInfo.delete();
+            domainsInfo = new File("domainsInfo.txt");
+
+            BufferedWriter myWriterDomains = new BufferedWriter(new FileWriter(domainsInfo, true));
+
+            for (Domain d : domains) {
+                LinkedList<String> usersDom = d.getUsers();
+                StringBuilder stringBuilderUsers = new StringBuilder();
+                StringBuilder stringBuilderDevices = new StringBuilder();
+
+                for (String s : usersDom) {
+                    stringBuilderUsers.append(s + " ");
+                }
+
+                myWriterDomains.write(d.getName() + " (Users): " + stringBuilderUsers.toString() + System.getProperty("line.separator"));
+
+                if (d.getDevices() != null) {
+                    LinkedList<String> devicesDom = d.getDevices();
+
+                    for (String s : devicesDom) {
+                        stringBuilderDevices.append(s + " ");
+                    }
+
+                    myWriterDomains.write(d.getName() + " (Devices): " + stringBuilderDevices.toString() + System.getProperty("line.separator"));
+                }
+                else 
+                {
+                    myWriterDomains.write(d.getName() + " (Devices): " + System.getProperty("line.separator"));
+                }
+            }
+
+            myWriterDomains.close();
         }
     }
 
