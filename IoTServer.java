@@ -178,7 +178,8 @@ public class IoTServer {
 
     static class ClientHandler implements Runnable {
         private Socket clientSocket;
-        
+
+
         public ClientHandler(Socket clientSocket) {
             this.clientSocket = clientSocket;
         }
@@ -352,7 +353,7 @@ public class IoTServer {
                             temps.put(temp[0] + ":" + currDevId, Float.parseFloat(reqSplit[1]));
                             break;
                         case "EI":
-                            ei(temp[0], currDevId);
+                            ei(temp[0], currDevId,in);
                             out.writeObject("OK");
                             out.flush();
                             System.out.println("Esta aqui");
@@ -599,19 +600,18 @@ public class IoTServer {
             myWriterDomains.close();
         }
 
-        public void ei(String name, int devid){
+        public void ei(String name, int devid,ObjectInputStream in){
             String destinationFileName = name + "-" + devid + ".jpg";
     
             try {
                 // Receive file size from client
-                DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
-                int fileSize = dataInputStream.readInt();
+                int fileSize = in.readInt();
     
                 // Create buffer to read file data
                 byte[] buffer = new byte[fileSize];
                 int totalBytesRead = 0;
                 int bytesRead;
-                while (totalBytesRead < fileSize && (bytesRead = clientSocket.getInputStream().read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
+                while (totalBytesRead < fileSize && (bytesRead = in.read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
                     totalBytesRead += bytesRead;
                 }
     
@@ -623,9 +623,6 @@ public class IoTServer {
                 FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
                 fileOutputStream.write(buffer, 0, totalBytesRead);
                 fileOutputStream.close();
-    
-                // Close streams and sockets
-                dataInputStream.close();
     
                 System.out.println("File received from client and saved successfully.");
             } catch (IOException e) {

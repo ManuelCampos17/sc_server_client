@@ -33,7 +33,8 @@ import javax.imageio.ImageIO;
 public class IoTDevice {
 
     private static Socket clientSocket;
-
+    private static ObjectOutputStream out;
+    private static ObjectInputStream in;
     public static void main(String[] args) {
         try {
             System.out.println("Client Initializing...");
@@ -58,8 +59,8 @@ public class IoTDevice {
                 port = Integer.parseInt(addr[1]);
             }
             clientSocket = new Socket(serverAddress, port);
-            ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-            ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
+            out = new ObjectOutputStream(clientSocket.getOutputStream());
+            in = new ObjectInputStream(clientSocket.getInputStream());
 
             // Pedir a password
             System.out.print("Insere a tua Password: ");
@@ -299,25 +300,21 @@ public class IoTDevice {
     public static void ei(String sourceFileName){
 
         try (
-             FileInputStream fileInputStream = new FileInputStream(sourceFileName);
-             OutputStream outputStream = clientSocket.getOutputStream()) {
+             FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
 
             // Read the entire file into memory
             byte[] fileData = fileInputStream.readAllBytes();
             int fileSize = fileData.length;
 
             // Write the file size to the output stream
-            DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
-            dataOutputStream.writeInt(fileSize);
+            out.writeInt(fileSize);
 
             // Write the file data to the output stream
-            outputStream.write(fileData);
-            outputStream.flush(); // Ensure all data is sent
+            out.write(fileData);
+            out.flush(); // Ensure all data is sent
 
             //close
             fileInputStream.close();
-            outputStream.close();
-            dataOutputStream.close();
             
             System.out.println("File sent to server successfully.");
             
