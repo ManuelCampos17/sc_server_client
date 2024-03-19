@@ -52,7 +52,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6584");
+                myWriterClient.write("IoTDevice.class:6674");
                 myWriterClient.close();
             } else 
             {
@@ -352,32 +352,12 @@ public class IoTServer {
                             temps.put(temp[0] + ":" + currDevId, Float.parseFloat(reqSplit[1]));
                             break;
                         case "EI":
-                            boolean eiCond = reqSplit[1].endsWith(".jpg");
-
-                            long fileSize = in.readLong();
-
-                            byte[] buffer = new byte[(int) fileSize];
-
-                            int bytesRead = 0;
-                            int count;
-                            while (bytesRead < fileSize) {
-                                count = in.read(buffer);
-                                if (count == -1)
-                                    break;
-                                bytesRead += count;
-                            }
-
-                            if (eiCond) {
-                                out.writeObject("OK");
-                                out.flush();
-
-                                createFile(buffer, temp[0] + "_" + currDevId, (int) fileSize);
-                                break;
-                            }
-
-                            out.writeObject("NOK");
+                            ei(temp[0], currDevId);
+                            out.writeObject("OK");
                             out.flush();
+                            System.out.println("Esta aqui");
                             break;
+                            
                         case "RT":
                             //Primeiro criar o file para enviar
                             File rtFile = new File("tempsFile.txt");
@@ -617,6 +597,41 @@ public class IoTServer {
             }
 
             myWriterDomains.close();
+        }
+
+        public void ei(String name, int devid){
+            String destinationFileName = name + "-" + devid + ".jpg";
+    
+            try {
+                // Receive file size from client
+                DataInputStream dataInputStream = new DataInputStream(clientSocket.getInputStream());
+                int fileSize = dataInputStream.readInt();
+    
+                // Create buffer to read file data
+                byte[] buffer = new byte[fileSize];
+                int totalBytesRead = 0;
+                int bytesRead;
+                while (totalBytesRead < fileSize && (bytesRead = clientSocket.getInputStream().read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
+                    totalBytesRead += bytesRead;
+                }
+    
+                if (totalBytesRead != fileSize) {
+                    throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
+                }
+    
+                // Write received file data to the destination file
+                FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
+                fileOutputStream.write(buffer, 0, totalBytesRead);
+                fileOutputStream.close();
+    
+                // Close streams and sockets
+                dataInputStream.close();
+    
+                System.out.println("File received from client and saved successfully.");
+            } catch (IOException e) {
+                System.out.println("An error occurred: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 

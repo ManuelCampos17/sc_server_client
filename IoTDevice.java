@@ -19,6 +19,7 @@ import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.Scanner;
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
@@ -30,6 +31,8 @@ import javax.imageio.ImageIO;
 // --------------------------------- //
 // --------------------------------- //
 public class IoTDevice {
+
+    private static Socket clientSocket;
 
     public static void main(String[] args) {
         try {
@@ -54,8 +57,7 @@ public class IoTDevice {
                 serverAddress = addr[0];
                 port = Integer.parseInt(addr[1]);
             }
-
-            Socket clientSocket = new Socket(serverAddress, port);
+            clientSocket = new Socket(serverAddress, port);
             ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
             ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
 
@@ -203,25 +205,11 @@ public class IoTDevice {
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("EI")) {
-
-                    if (parts.length != 2) {
-                        System.out.println("Invalid command");
-                        continue;
-                    } else {
-                        File imgFile = new File(parts[1]);
-                        BufferedImage bImage = ImageIO.read(imgFile);
-                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                        ImageIO.write(bImage, "jpg", bos );
-                        byte [] buffer = bos.toByteArray();
-                        FileInputStream fin = new FileInputStream(imgFile);
-                        bis = new BufferedInputStream(fin);
-                        int bytesRead = bis.read(buffer, 0, buffer.length);
-
-                        out.writeObject("EI" + " " + parts[1]);
-                        out.writeLong(bytesRead);
-                        out.write(buffer, 0, bytesRead);
-                        out.flush();
-                    }
+                    out.writeObject(command);
+                    out.flush();
+                    String sourceFileName = parts[1];
+                    ei(sourceFileName);
+                    System.out.println("Teste123");
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
@@ -306,5 +294,36 @@ public class IoTDevice {
             return false;
         }
         return true;
+    }
+
+    public static void ei(String sourceFileName){
+
+        try (
+             FileInputStream fileInputStream = new FileInputStream(sourceFileName);
+             OutputStream outputStream = clientSocket.getOutputStream()) {
+
+            // Read the entire file into memory
+            byte[] fileData = fileInputStream.readAllBytes();
+            int fileSize = fileData.length;
+
+            // Write the file size to the output stream
+            DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+            dataOutputStream.writeInt(fileSize);
+
+            // Write the file data to the output stream
+            outputStream.write(fileData);
+            outputStream.flush(); // Ensure all data is sent
+
+            //close
+            fileInputStream.close();
+            outputStream.close();
+            dataOutputStream.close();
+            
+            System.out.println("File sent to server successfully.");
+            
+        } catch (IOException e) {
+            System.out.println("An error occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
