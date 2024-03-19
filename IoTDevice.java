@@ -228,8 +228,8 @@ public class IoTDevice {
                         out.writeObject("RT" + " " + parts[1]);
                         out.flush();
                     }
+
                     srvResponse = (String) in.readObject();
-                    System.out.println(srvResponse);
 
                     if (srvResponse.startsWith("OK")) {
                         long fileSize = (long) in.readObject();
@@ -245,7 +245,11 @@ public class IoTDevice {
                             bytesRead += count;
                         }
                         String fileContent = new String(buffer);
-                        System.out.println(fileContent);
+                        System.out.println(srvResponse + ", " + fileSize + " (long), " + fileContent);
+                    }
+                    else 
+                    {
+                        System.out.println(srvResponse);
                     }
 
                 } else if (command.startsWith("RI")) { // print("OK" + " " + fileSize + " " + conteudo)

@@ -51,7 +51,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6175");
+                myWriterClient.write("IoTDevice.class:6284");
                 myWriterClient.close();
             } else 
             {
@@ -365,7 +365,8 @@ public class IoTServer {
                             break;
                         case "RT":
                             //Primeiro criar o file para enviar
-                            File rtFile = new File("tempFile.txt");
+                            File rtFile = new File("tempsFile.txt");
+
                             BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
                             Domain rtDomain = null;
 
@@ -395,11 +396,15 @@ public class IoTServer {
                                 break;
                             }
 
-                            for (String currId : rtDomain.getDevices()) {
+                            for (int i = 0; i < rtDomain.getDevices().size(); i++) {
+                                String currId = rtDomain.getDevices().get(i);
+
                                 if (temps.containsKey(currId)) {
                                     rtFileWriter.write(currId + ":" + temps.get(currId) + " ");
                                 }
                             }
+
+                            rtFileWriter.close();
 
                             //Enviar o filesize e o file
                             FileInputStream finRT = new FileInputStream(rtFile);
@@ -412,6 +417,9 @@ public class IoTServer {
                             out.flush();
                             out.write(bufferRT);
                             out.flush();
+                            inputRT.close();
+                            finRT.close();
+                            rtFile.delete();
                             break;
                         case "RI":
                             String[] userDataRI = reqSplit[1].split(":");
