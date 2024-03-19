@@ -26,7 +26,9 @@ public class IoTServer {
     private static Map<String, Float> temps = new HashMap<String, Float>();
 
     //Last device img
-    private static Map<String, String> imgs = new HashMap<String, String>();
+    private static Map<String, String> imgsNames = new HashMap<String, String>();
+    private static Map<String, Long> imgsSizes = new HashMap<String, Long>();
+    private static Map<String, String> imgsContent = new HashMap<String, String>();
 
     //Usernames e passwords
     private static File userFile;
@@ -51,7 +53,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6284");
+                myWriterClient.write("IoTDevice.class:6584");
                 myWriterClient.close();
             } else 
             {
@@ -353,10 +355,27 @@ public class IoTServer {
                         case "EI":
                             boolean eiCond = reqSplit[1].endsWith(".jpg");
 
+                            long fileSize = in.readLong();
+
+                            byte[] buffer = new byte[(int) fileSize];
+
+                            int bytesRead = 0;
+                            int count;
+                            while (bytesRead < fileSize) {
+                                count = in.read(buffer);
+                                if (count == -1)
+                                    break;
+                                bytesRead += count;
+                            }
+
+                            String fileContent = new String(buffer);
+
                             if (eiCond) {
                                 out.writeObject("OK");
                                 out.flush();
-                                imgs.put(temp[0] + ":" + currDevId, reqSplit[1]);
+                                imgsNames.put(temp[0] + ":" + currDevId, reqSplit[1]);
+                                imgsSizes.put(temp[0] + ":" + currDevId, fileSize);
+                                imgsContent.put(temp[0] + ":" + currDevId, fileContent);
                                 break;
                             }
 
@@ -430,7 +449,7 @@ public class IoTServer {
                                 break;
                             }
 
-                            if (!imgs.containsKey(reqSplit[1])) {
+                            if (!imgsNames.containsKey(reqSplit[1])) {
                                 out.writeObject("NODATA # nao existem dados de imagem publicados");
                                 out.flush();
                                 break;
@@ -448,7 +467,7 @@ public class IoTServer {
                             }
 
                             //Enviar o filesize e o file
-                            File riFile = new File(imgs.get(reqSplit[1]));
+                            File riFile = new File(imgsNames.get(reqSplit[1]));
                             FileInputStream finRI = new FileInputStream(riFile);
                             InputStream inputRI = new BufferedInputStream(finRI);
                             byte[] bufferRI = new byte[(int)riFile.length()];

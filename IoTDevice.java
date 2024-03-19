@@ -18,6 +18,9 @@ import java.io.FileInputStream;
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.Scanner;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 
 // --------------------------------- //
 // --------------------------------- //
@@ -205,14 +208,17 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        File file = new File(parts[1]);
-                        byte[] buffer = new byte[(int) file.length()];
-                        FileInputStream fin = new FileInputStream(file);
+                        File imgFile = new File(parts[1]);
+                        BufferedImage bImage = ImageIO.read(imgFile);
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        ImageIO.write(bImage, "jpg", bos );
+                        byte [] buffer = bos.toByteArray();
+                        FileInputStream fin = new FileInputStream(imgFile);
                         bis = new BufferedInputStream(fin);
                         int bytesRead = bis.read(buffer, 0, buffer.length);
 
                         out.writeObject("EI" + " " + parts[1]);
-                        out.writeInt(bytesRead);
+                        out.writeLong(bytesRead);
                         out.write(buffer, 0, bytesRead);
                         out.flush();
                     }
