@@ -1,8 +1,12 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+
 import java.util.LinkedList;
 
 // IoTServer [port]
@@ -24,11 +28,6 @@ public class IoTServer {
 
     //Last device temp
     private static Map<String, Float> temps = new HashMap<String, Float>();
-
-    //Last device img
-    private static Map<String, String> imgsNames = new HashMap<String, String>();
-    private static Map<String, Long> imgsSizes = new HashMap<String, Long>();
-    private static Map<String, String> imgsContent = new HashMap<String, String>();
 
     //Usernames e passwords
     private static File userFile;
@@ -368,14 +367,11 @@ public class IoTServer {
                                 bytesRead += count;
                             }
 
-                            String fileContent = new String(buffer);
-
                             if (eiCond) {
                                 out.writeObject("OK");
                                 out.flush();
-                                imgsNames.put(temp[0] + ":" + currDevId, reqSplit[1]);
-                                imgsSizes.put(temp[0] + ":" + currDevId, fileSize);
-                                imgsContent.put(temp[0] + ":" + currDevId, fileContent);
+
+                                createFile(buffer, temp[0] + "_" + currDevId, (int) fileSize);
                                 break;
                             }
 
@@ -449,11 +445,11 @@ public class IoTServer {
                                 break;
                             }
 
-                            if (!imgsNames.containsKey(reqSplit[1])) {
-                                out.writeObject("NODATA # nao existem dados de imagem publicados");
-                                out.flush();
-                                break;
-                            }
+                            // if (!imgsNames.containsKey(reqSplit[1])) {
+                            //     out.writeObject("NODATA # nao existem dados de imagem publicados");
+                            //     out.flush();
+                            //     break;
+                            // }
 
                             for (Domain dom : domains) {
                                 if (dom.getDevices().contains(reqSplit[1])) {
@@ -467,17 +463,17 @@ public class IoTServer {
                             }
 
                             //Enviar o filesize e o file
-                            File riFile = new File(imgsNames.get(reqSplit[1]));
-                            FileInputStream finRI = new FileInputStream(riFile);
-                            InputStream inputRI = new BufferedInputStream(finRI);
-                            byte[] bufferRI = new byte[(int)riFile.length()];
-                            long bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
+                            // File riFile = new File(imgsNames.get(reqSplit[1]));
+                            // FileInputStream finRI = new FileInputStream(riFile);
+                            // InputStream inputRI = new BufferedInputStream(finRI);
+                            // byte[] bufferRI = new byte[(int)riFile.length()];
+                            // long bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
 
-                            out.writeObject("OK");
-                            out.writeObject(bytesReadRI);
-                            out.flush();
-                            out.write(bufferRI);
-                            out.flush();
+                            // out.writeObject("OK");
+                            // out.writeObject(bytesReadRI);
+                            // out.flush();
+                            // out.write(bufferRI);
+                            // out.flush();
                             break;
                         default:     
                             out.writeObject("Pedido Invalido!");
@@ -485,6 +481,17 @@ public class IoTServer {
                     }
                 }
             } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private static void createFile(byte[] buffer, String user, int fileSize) {
+            try {
+                ByteArrayInputStream bis = new ByteArrayInputStream(buffer);
+                BufferedImage bImage2 = ImageIO.read(bis);
+                ImageIO.write(bImage2, "jpg", new File(user + ".jpg") );
+                System.out.println("image created");
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
