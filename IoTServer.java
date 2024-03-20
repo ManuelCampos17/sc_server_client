@@ -59,7 +59,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6907");
+                myWriterClient.write("IoTDevice.class:6951");
                 myWriterClient.close();
             } else 
             {
@@ -416,6 +416,7 @@ public class IoTServer {
                                     if (!dom.getUsers().contains(temp[0])) {
                                         out.writeObject("NOPERM # sem permissoes de leitura");
                                         out.flush();
+                                        rtFile.delete();
                                         break;
                                     }
 
@@ -426,12 +427,14 @@ public class IoTServer {
                             if (rtDomain == null) {
                                 out.writeObject("NODM # esse dominio nao existe");
                                 out.flush();
+                                rtFile.delete();
                                 break;
                             }
 
                             if (temps.isEmpty()) {
                                 out.writeObject("NODATA # nao existem dados de temperatura publicados");
                                 out.flush();
+                                rtFile.delete();
                                 break;
                             }
 
@@ -463,41 +466,83 @@ public class IoTServer {
                         case "RI":
                             String[] userDataRI = reqSplit[1].split(":");
 
-                            if (!connected.get(userDataRI[0]).contains(reqSplit[1])) {
+                            BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+                            String regReaderLine = regReader.readLine();
+                            LinkedList<String> devs = new LinkedList<String>();
+
+                            while (regReaderLine != null){
+                                devs.add(regReaderLine);
+                                regReaderLine = regReader.readLine();
+                            }
+
+                            regReader.close();
+
+                            if (!devs.contains(reqSplit[1])) {
                                 out.writeObject("NOID # esse device id não existe");
                                 out.flush();
                                 break;
                             }
 
-                            // if (!imgsNames.containsKey(reqSplit[1])) {
-                            //     out.writeObject("NODATA # nao existem dados de imagem publicados");
-                            //     out.flush();
-                            //     break;
-                            // }
+                            if (!new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg").exists()) {
+                                out.writeObject("NODATA # nao existem dados de imagem publicados");
+                                out.flush();
+                                break;
+                            }
+                            
+                            boolean hasPerms = false;
 
-                            for (Domain dom : domains) {
-                                if (dom.getDevices().contains(reqSplit[1])) {
-                                    //Check read perms
-                                    if (!dom.getUsers().contains(temp[0])) {
-                                        out.writeObject("NOPERM # sem permissoes de leitura");
-                                        out.flush();
-                                        break;
+                            if (reqSplit[1].equals(temp[0] + ":" + currDevId)) {
+                                hasPerms = true;
+                            }
+                            else 
+                            {
+                                for (Domain dom : domains) {
+                                    if (dom.getDevices().contains(reqSplit[1])) {
+                                        //Check read perms
+                                        if (dom.getUsers().contains(temp[0])) {
+                                            hasPerms = true;
+                                        }
                                     }
                                 }
                             }
 
-                            //Enviar o filesize e o file
-                            // File riFile = new File(imgsNames.get(reqSplit[1]));
-                            // FileInputStream finRI = new FileInputStream(riFile);
-                            // InputStream inputRI = new BufferedInputStream(finRI);
-                            // byte[] bufferRI = new byte[(int)riFile.length()];
-                            // long bytesReadRI = inputRI.read(bufferRI,0,bufferRI.length);
+                            if (!hasPerms) {
+                                out.writeObject("NOPERM # sem permissoes de leitura");
+                                out.flush();
+                                break;
+                            }
 
-                            // out.writeObject("OK");
-                            // out.writeObject(bytesReadRI);
-                            // out.flush();
-                            // out.write(bufferRI);
-                            // out.flush();
+                            try (
+                                FileInputStream fileInputStream = new FileInputStream(userDataRI[0] + "_" + userDataRI[1] + ".jpg")) {
+
+                                // Get the file size
+                                File file = new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg");
+                                int fileSize = (int) file.length();
+                                byte[] fileData = new byte[fileSize];
+
+                                // Read the entire file into memory
+                                int bytesRead = 0;
+                                while (bytesRead < fileSize) {
+                                    bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
+                                }
+
+                                out.writeObject("OK");
+                                // Write the file size to the output stream
+                                out.writeLong(fileSize);
+
+                                // Write the file data to the output stream
+                                out.write(fileData);
+                                out.flush(); // Ensure all data is sent
+
+                                //close
+                                fileInputStream.close();
+                                
+                                System.out.println("File sent to client successfully.");
+                                
+                            } catch (IOException e) {
+                                System.out.println("An error occurred: " + e.getMessage());
+                                e.printStackTrace();
+                            }
                             break;
                         default:     
                             out.writeObject("Pedido Invalido!");

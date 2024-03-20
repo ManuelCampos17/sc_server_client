@@ -257,10 +257,9 @@ public class IoTDevice {
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
-                    System.out.println(srvResponse);
 
                     if (srvResponse.startsWith("OK")) {
-                        long fileSize = (long) in.readObject();
+                        long fileSize = in.readLong();
 
                         byte[] buffer = new byte[(int) fileSize];
 
@@ -272,8 +271,9 @@ public class IoTDevice {
                                 break;
                             bytesRead += count;
                         }
+
                         String fileContent = new String(buffer);
-                        System.out.println(fileContent);
+                        System.out.println(srvResponse + ", " + fileSize + " (long)," + fileContent);
                     }
 
                 } else {
@@ -297,32 +297,6 @@ public class IoTDevice {
         return true;
     }
 
-    // public static void ei(String sourceFileName){
-
-    //     try (
-    //          FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
-
-    //         // Read the entire file into memory
-    //         byte[] fileData = fileInputStream.readAllBytes();
-    //         int fileSize = fileData.length;
-
-    //         // Write the file size to the output stream
-    //         out.writeInt(fileSize);
-
-    //         // Write the file data to the output stream
-    //         out.write(fileData);
-    //         out.flush(); // Ensure all data is sent
-
-    //         //close
-    //         fileInputStream.close();
-            
-    //         System.out.println("File sent to server successfully.");
-            
-    //     } catch (IOException e) {
-    //         System.out.println("An error occurred: " + e.getMessage());
-    //         e.printStackTrace();
-    //     }
-    // }
     public static void ei(String sourceFileName){
         try (
              FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
