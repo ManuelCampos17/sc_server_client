@@ -397,7 +397,6 @@ public class IoTServer {
                             ei(temp[0], currDevId,in);
                             out.writeObject("OK");
                             out.flush();
-                            System.out.println("Esta aqui");
                             break;
                             
                         case "RT":
