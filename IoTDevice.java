@@ -297,14 +297,46 @@ public class IoTDevice {
         return true;
     }
 
-    public static void ei(String sourceFileName){
+    // public static void ei(String sourceFileName){
 
+    //     try (
+    //          FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
+
+    //         // Read the entire file into memory
+    //         byte[] fileData = fileInputStream.readAllBytes();
+    //         int fileSize = fileData.length;
+
+    //         // Write the file size to the output stream
+    //         out.writeInt(fileSize);
+
+    //         // Write the file data to the output stream
+    //         out.write(fileData);
+    //         out.flush(); // Ensure all data is sent
+
+    //         //close
+    //         fileInputStream.close();
+            
+    //         System.out.println("File sent to server successfully.");
+            
+    //     } catch (IOException e) {
+    //         System.out.println("An error occurred: " + e.getMessage());
+    //         e.printStackTrace();
+    //     }
+    // }
+    public static void ei(String sourceFileName){
         try (
              FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
 
+            // Get the file size
+            File file = new File(sourceFileName);
+            int fileSize = (int) file.length();
+            byte[] fileData = new byte[fileSize];
+
             // Read the entire file into memory
-            byte[] fileData = fileInputStream.readAllBytes();
-            int fileSize = fileData.length;
+            int bytesRead = 0;
+            while (bytesRead < fileSize) {
+                bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
+            }
 
             // Write the file size to the output stream
             out.writeInt(fileSize);

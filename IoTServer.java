@@ -1,6 +1,7 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -461,6 +462,8 @@ public class IoTServer {
                             out.flush();
                     }
                 }
+            } catch (SocketException e) {
+                System.out.println(("Client disconnected: " + e.getMessage()));
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
