@@ -39,13 +39,16 @@ public class IoTServer {
     //Domain file
     private static File domainsInfo;
 
+    //Temps
+    private static File tempsFile;
+
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
         if (args.length > 0) {
             port = Integer.parseInt(args[0]);
         }
 
-        //Criar size e nome do client executable
+        //Criar size e nome do client executable caso nao exista
         clientProgramData = new File("clientProgram.txt");
         try {
             if (clientProgramData.createNewFile()) {
@@ -53,7 +56,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6674");
+                myWriterClient.write("IoTDevice.class:6907");
                 myWriterClient.close();
             } else 
             {
@@ -63,7 +66,7 @@ public class IoTServer {
             e.printStackTrace();
         }
 
-        //Criar file com info dos domains (vazio por agora)
+        //Criar file com info dos domains caso nao exista (vazio por agora)
         domainsInfo = new File("domainsInfo.txt");
         try {
             if (domainsInfo.createNewFile()) {
@@ -79,27 +82,34 @@ public class IoTServer {
         try (ServerSocket srvSocket = new ServerSocket(port)) {
             System.out.println("Server initialized on port: " + port);
 
+            //Criar user file caso nao exista
             userFile = new File("userCredentials.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
             } else {
                 System.out.println("Users file already exists.");
             }
+            
+            //Criar temps file caso nao exista
+            tempsFile = new File("tempsFile.txt");
+            if (tempsFile.createNewFile()) {
+                System.out.println("Temps file created");
+            } else {
+                System.out.println("Temps file already exists.");
+            }
 
             //Ir buscar as credentials que ja estao no file
-            Map<String, String> users = new HashMap<String, String>();
             try {
                 BufferedReader rb = new BufferedReader(new FileReader("userCredentials.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
                     String[] user = line.split(":");
-                    users.put(user[0], user[1]);
+                    userCredentials.put(user[0], user[1]);
                     line = rb.readLine();
                 }
 
                 rb.close();
-                userCredentials = users;
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
             }
@@ -131,6 +141,7 @@ public class IoTServer {
                 }
 
                 rbDevices.close();
+                devicesListByDomain.remove(" ");
 
                 LinkedList<String> domainsList = new LinkedList<String>();
 
@@ -156,13 +167,29 @@ public class IoTServer {
                     lineUsers = rbUsers.readLine();
                 }
 
+                usersListByDomain.remove(" ");
+                rbUsers.close();
+
                 for (String dom : domainsList) {
                     Domain currDom = new Domain(dom, usersListByDomain.get(dom).get(0), devicesListByDomain.get(dom), usersListByDomain.get(dom));
                     domains.add(currDom);
                 }
+            } catch (Exception e) {
+                System.out.println("Erro: " + e);
+            }
 
-                rbUsers.close();
+            //Ir buscar as temps que ja estao no file
+            try {
+                BufferedReader rb = new BufferedReader(new FileReader("tempsFile.txt"));
+                String line = rb.readLine();
 
+                while (line != null){
+                    String[] userTemp = line.split(":");
+                    temps.put(userTemp[0], Float.parseFloat(userTemp[1]));
+                    line = rb.readLine();
+                }
+
+                rb.close();
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
             }
@@ -331,7 +358,7 @@ public class IoTServer {
                             }
 
                             domains.remove(selectedDomRD);
-                            selectedDomRD.addDevice(temp[0] + ":" + currDevId);;
+                            selectedDomRD.addDevice(temp[0] + "_" + currDevId);;
                             domains.add(selectedDomRD);
                             
                             updateDomainsFile();
@@ -351,7 +378,20 @@ public class IoTServer {
                             out.writeObject("OK");
                             out.flush();
 
-                            temps.put(temp[0] + ":" + currDevId, Float.parseFloat(reqSplit[1]));
+                            temps.put(temp[0] + "_" + currDevId, Float.parseFloat(reqSplit[1]));
+
+                            //Write no temps file
+                            tempsFile.delete();
+                            tempsFile = new File("tempsFile.txt");
+
+                            BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
+
+                            for (Map.Entry<String, Float> set : temps.entrySet()) {
+                                etFileWriter.write(set.getKey() + ":" + set.getValue() + System.getProperty("line.separator"));
+                            }
+
+                            etFileWriter.close();
+
                             break;
                         case "EI":
                             ei(temp[0], currDevId,in);
@@ -362,7 +402,7 @@ public class IoTServer {
                             
                         case "RT":
                             //Primeiro criar o file para enviar
-                            File rtFile = new File("tempsFile.txt");
+                            File rtFile = new File("tempsFileSend.txt");
 
                             BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
                             Domain rtDomain = null;
