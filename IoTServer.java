@@ -42,6 +42,9 @@ public class IoTServer {
     //Temps
     private static File tempsFile;
 
+    //Registered devices history
+    private static File regHist;
+
     public static void main(String[] args) {
         int port = DEFAULT_PORT;
         if (args.length > 0) {
@@ -218,7 +221,7 @@ public class IoTServer {
                 ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
             ) {
-                System.out.println("Client connected família");
+                System.out.println("Client connected");
                 String login = (String) in.readObject();
                 String[] temp = login.split(":");
 
@@ -572,6 +575,49 @@ public class IoTServer {
                 connected.put(user, appendUserDevIdEmpty);
             }
 
+            //Criar registered devices history ou atualizar
+            regHist = new File("registeredDevices.txt");
+            try {
+                if (regHist.createNewFile()) {
+                    System.out.println("Registered devices history file created.");
+                } else 
+                {
+                    System.out.println("Registered devices history already present, registering device...");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+            String regReaderLine = regReader.readLine();
+            LinkedList<String> devs = new LinkedList<String>();
+
+            while (regReaderLine != null){
+                devs.add(regReaderLine);
+                regReaderLine = regReader.readLine();
+            }
+
+            regReader.close();
+
+            if (!devs.contains(user + ":" + dev_id)) {
+                devs.add(user + ":" + dev_id);
+            }
+            else 
+            {
+                System.out.println("Device already registered.");
+            }
+
+            regHist.delete();
+            regHist = new File("registeredDevices.txt");
+
+            BufferedWriter myWriterRegs = new BufferedWriter(new FileWriter(regHist, true));
+
+            for (String s : devs) {
+                myWriterRegs.write(s + System.getProperty("line.separator"));
+            }
+
+            myWriterRegs.close();
+
             out.writeObject("OK-DEVID");
             out.flush();
 
@@ -643,7 +689,7 @@ public class IoTServer {
         }
 
         public void ei(String name, int devid,ObjectInputStream in){
-            String destinationFileName = name + "-" + devid + ".jpg";
+            String destinationFileName = name + "_" + devid + ".jpg";
     
             try {
                 // Receive file size from client
