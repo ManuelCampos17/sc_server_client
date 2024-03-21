@@ -203,7 +203,12 @@ public class IoTDevice {
                     out.writeObject(command);
                     out.flush();
                     String sourceFileName = parts[1];
-                    ei(sourceFileName);
+                    boolean retEi = ei(sourceFileName);
+
+                    if (!retEi) {
+                        continue;
+                    }
+                    
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
@@ -290,9 +295,16 @@ public class IoTDevice {
         return true;
     }
 
-    public static void ei(String sourceFileName){
+    public static boolean ei(String sourceFileName){
         try (
              FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
+
+            try {
+                out.writeObject("found");
+                out.flush();
+            } catch (IOException e2) {
+                e2.printStackTrace();
+            }
 
             // Get the file size
             File file = new File(sourceFileName);
@@ -316,10 +328,23 @@ public class IoTDevice {
             fileInputStream.close();
             
             System.out.println("File sent to server successfully.");
+            return true;
             
+        } catch (FileNotFoundException e) {
+            System.out.println("Image file not found, select a valid image.");
+
+            try {
+                out.writeObject("notfound");
+                out.flush();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+
+            return false;
         } catch (IOException e) {
             System.out.println("An error occurred: " + e.getMessage());
             e.printStackTrace();
+            return false;
         }
     }
 }

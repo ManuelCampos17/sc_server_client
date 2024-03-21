@@ -59,7 +59,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6839");
+                myWriterClient.write("IoTDevice.class:7197");
                 myWriterClient.close();
             } else 
             {
@@ -400,9 +400,7 @@ public class IoTServer {
 
                             break;
                         case "EI":
-                            ei(temp[0], currDevId,in);
-                            out.writeObject("OK");
-                            out.flush();
+                            ei(reqSplit[1], temp[0], currDevId, in, out);
                             break;
                         case "RT":
                             //Primeiro criar o file para enviar
@@ -724,8 +722,21 @@ public class IoTServer {
             myWriterDomains.close();
         }
 
-        public void ei(String name, int devid,ObjectInputStream in){
+        public void ei(String fileName, String name, int devid,ObjectInputStream in, ObjectOutputStream out){
             String destinationFileName = name + "_" + devid + ".jpg";
+
+            String rec = null;
+            try {
+                rec = (String) in.readObject();
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if (!rec.equals("found")) {
+                return;
+            }
     
             try {
                 // Receive file size from client
@@ -742,13 +753,25 @@ public class IoTServer {
                 if (totalBytesRead != fileSize) {
                     throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
                 }
-    
-                // Write received file data to the destination file
-                FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
-                fileOutputStream.write(buffer, 0, totalBytesRead);
-                fileOutputStream.close();
-    
-                System.out.println("File received from client and saved successfully.");
+                
+                if (fileName.endsWith(".jpg")) {
+                    // Write received file data to the destination file
+                    FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
+                    fileOutputStream.write(buffer, 0, totalBytesRead);
+                    fileOutputStream.close();
+        
+                    System.out.println("File received from client and saved successfully.");
+
+                    out.writeObject("OK");
+                    out.flush();
+                }
+                else 
+                {
+                    out.writeObject("NOK");
+                    out.flush();
+                }
+
+                return;
             } catch (IOException e) {
                 System.out.println("An error occurred: " + e.getMessage());
                 e.printStackTrace();
