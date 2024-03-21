@@ -59,7 +59,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:6951");
+                myWriterClient.write("IoTDevice.class:6839");
                 myWriterClient.close();
             } else 
             {
@@ -270,19 +270,22 @@ public class IoTServer {
                                 break;
                             }
                             
+                            boolean found = false;
                             for (Domain dom : domains) {
                                 if (dom.getName().equals(reqSplit[1])) {
+                                    found = true;
                                     out.writeObject("NOK");
                                     out.flush();
                                     break;
                                 }
                             }
 
+                            if (found) break;
+
                             Domain newDomain = new Domain(reqSplit[1], temp[0]);
                             newDomain.addUser(temp[0]);
                             domains.add(newDomain);
                             
-
                             //Escrever no domains file
                             BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                             //O primeiro user é o creator
@@ -401,7 +404,6 @@ public class IoTServer {
                             out.writeObject("OK");
                             out.flush();
                             break;
-                            
                         case "RT":
                             //Primeiro criar o file para enviar
                             File rtFile = new File("tempsFileSend.txt");
@@ -552,17 +554,6 @@ public class IoTServer {
             } catch (SocketException e) {
                 System.out.println(("Client disconnected: " + e.getMessage()));
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private static void createFile(byte[] buffer, String user, int fileSize) {
-            try {
-                ByteArrayInputStream bis = new ByteArrayInputStream(buffer);
-                BufferedImage bImage2 = ImageIO.read(bis);
-                ImageIO.write(bImage2, "jpg", new File(user + ".jpg") );
-                System.out.println("image created");
-            } catch (IOException e) {
                 e.printStackTrace();
             }
         }

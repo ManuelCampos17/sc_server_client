@@ -15,6 +15,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.Scanner;
@@ -186,13 +187,6 @@ public class IoTDevice {
                     }
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
-
-                    if (srvResponse.startsWith("OK")) {
-                        System.out.println("Device Registered");
-                    } else {
-                        System.out.println(srvResponse);
-                    }
-
                 } else if (command.startsWith("ET")) {
 
                     if (parts.length != 2) {
@@ -210,7 +204,6 @@ public class IoTDevice {
                     out.flush();
                     String sourceFileName = parts[1];
                     ei(sourceFileName);
-                    System.out.println("Teste123");
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
