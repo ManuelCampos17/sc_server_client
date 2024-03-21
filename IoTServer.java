@@ -2,11 +2,11 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 
 import java.util.LinkedList;
 
@@ -17,6 +17,7 @@ import java.util.LinkedList;
 
 public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
+    private static Lock fileLock = new ReentrantLock();
 
     //User -> Password
     private static Map<String, String> userCredentials = new HashMap<>();
@@ -52,6 +53,7 @@ public class IoTServer {
         }
 
         //Criar size e nome do client executable caso nao exista
+        fileLock.lock();
         clientProgramData = new File("clientProgram.txt");
         try {
             if (clientProgramData.createNewFile()) {
@@ -59,7 +61,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:7197");
+                myWriterClient.write("IoTDevice.class:6839");
                 myWriterClient.close();
             } else 
             {
@@ -67,8 +69,11 @@ public class IoTServer {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            fileLock.unlock();
         }
 
+        fileLock.lock();
         //Criar file com info dos domains caso nao exista (vazio por agora)
         domainsInfo = new File("domainsInfo.txt");
         try {
@@ -80,8 +85,11 @@ public class IoTServer {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            fileLock.unlock();
         }
 
+        fileLock.lock();
         try (ServerSocket srvSocket = new ServerSocket(port)) {
             System.out.println("Server initialized on port: " + port);
 
@@ -179,8 +187,11 @@ public class IoTServer {
                 }
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
+            } finally {
+                fileLock.unlock();
             }
 
+            fileLock.lock();
             //Ir buscar as temps que ja estao no file
             try {
                 BufferedReader rb = new BufferedReader(new FileReader("tempsFile.txt"));
@@ -195,6 +206,8 @@ public class IoTServer {
                 rb.close();
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
+            } finally {
+                fileLock.unlock();
             }
 
             while (true){
@@ -259,14 +272,21 @@ public class IoTServer {
                                 newDomain.addUser(temp[0]);
                                 domains.add(newDomain);
 
-                                //Escrever no domains file
-                                BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
-                                myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
-                                myWriterDomainsCR.close();
+                                fileLock.lock();
+                                try{
+                                    //Escrever no domains file
+                                    BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                                    myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                                    myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
+                                    myWriterDomainsCR.close();
 
-                                out.writeObject("OK");
-                                out.flush();
+                                    out.writeObject("OK");
+                                    out.flush();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                } finally {
+                                    fileLock.unlock();
+                                }
                                 break;
                             }
                             
@@ -286,15 +306,22 @@ public class IoTServer {
                             newDomain.addUser(temp[0]);
                             domains.add(newDomain);
                             
-                            //Escrever no domains file
-                            BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                            //O primeiro user é o creator
-                            myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
-                            myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
-                            myWriterDomainsCR.close();
+                            fileLock.lock();
+                            try{
+                                //Escrever no domains file
+                                BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                                //O primeiro user é o creator
+                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                                myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
+                                myWriterDomainsCR.close();
 
-                            out.writeObject("OK");
-                            out.flush();
+                                out.writeObject("OK");
+                                out.flush();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } finally {
+                                fileLock.unlock();
+                            }
                             break;
                         case "ADD":
                             if (!userCredentials.containsKey(reqSplit[1])) {
@@ -386,132 +413,157 @@ public class IoTServer {
 
                             temps.put(temp[0] + "_" + currDevId, Float.parseFloat(reqSplit[1]));
 
-                            //Write no temps file
-                            tempsFile.delete();
-                            tempsFile = new File("tempsFile.txt");
+                            fileLock.lock();
+                            try{
+                                //Write no temps file
+                                tempsFile.delete();
+                                tempsFile = new File("tempsFile.txt");
 
-                            BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
+                                BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
 
-                            for (Map.Entry<String, Float> set : temps.entrySet()) {
-                                etFileWriter.write(set.getKey() + ":" + set.getValue() + System.getProperty("line.separator"));
+                                for (Map.Entry<String, Float> set : temps.entrySet()) {
+                                    etFileWriter.write(set.getKey() + ":" + set.getValue() + System.getProperty("line.separator"));
+                                }
+
+                                etFileWriter.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } finally {
+                                fileLock.unlock();
                             }
-
-                            etFileWriter.close();
 
                             break;
                         case "EI":
                             ei(reqSplit[1], temp[0], currDevId, in, out);
                             break;
                         case "RT":
-                            //Primeiro criar o file para enviar
-                            File rtFile = new File("tempsFileSend.txt");
+                            fileLock.lock();
+                            try {
+                                //Primeiro criar o file para enviar
+                                File rtFile = new File("tempsFileSend.txt");
 
-                            BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
-                            Domain rtDomain = null;
+                                BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
+                                Domain rtDomain = null;
 
-                            for (Domain dom : domains) {
-                                
-                                if (dom.getName().equals(reqSplit[1])) {
-                                    //Check read perms
-                                    if (!dom.getUsers().contains(temp[0])) {
-                                        out.writeObject("NOPERM # sem permissoes de leitura");
-                                        out.flush();
-                                        rtFile.delete();
-                                        break;
+                                for (Domain dom : domains) {
+                                    
+                                    if (dom.getName().equals(reqSplit[1])) {
+                                        //Check read perms
+                                        if (!dom.getUsers().contains(temp[0])) {
+                                            out.writeObject("NOPERM # sem permissoes de leitura");
+                                            out.flush();
+                                            rtFileWriter.close();
+                                            rtFile.delete();
+                                            break;
+                                        }
+
+                                        rtDomain = dom;
                                     }
-
-                                    rtDomain = dom;
                                 }
-                            }
 
-                            if (rtDomain == null) {
-                                out.writeObject("NODM # esse dominio nao existe");
-                                out.flush();
-                                rtFile.delete();
-                                break;
-                            }
-
-                            if (temps.isEmpty()) {
-                                out.writeObject("NODATA # nao existem dados de temperatura publicados");
-                                out.flush();
-                                rtFile.delete();
-                                break;
-                            }
-
-                            for (int i = 0; i < rtDomain.getDevices().size(); i++) {
-                                String currId = rtDomain.getDevices().get(i);
-
-                                if (temps.containsKey(currId)) {
-                                    rtFileWriter.write(currId + ":" + temps.get(currId) + " ");
+                                if (rtDomain == null) {
+                                    out.writeObject("NODM # esse dominio nao existe");
+                                    out.flush();
+                                    rtFileWriter.close();
+                                    rtFile.delete();
+                                    break;
                                 }
+
+                                if (temps.isEmpty()) {
+                                    out.writeObject("NODATA # nao existem dados de temperatura publicados");
+                                    out.flush();
+                                    rtFileWriter.close();
+                                    rtFile.delete();
+                                    break;
+                                }
+
+                                for (int i = 0; i < rtDomain.getDevices().size(); i++) {
+                                    String currId = rtDomain.getDevices().get(i);
+
+                                    if (temps.containsKey(currId)) {
+                                        rtFileWriter.write(currId + ":" + temps.get(currId) + " ");
+                                    }
+                                }
+
+                                rtFileWriter.close();
+
+                                //Enviar o filesize e o file
+                                FileInputStream finRT = new FileInputStream(rtFile);
+                                InputStream inputRT = new BufferedInputStream(finRT);
+                                byte[] bufferRT = new byte[(int)rtFile.length()];
+                                long bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
+
+                                out.writeObject("OK");
+                                out.writeObject(bytesReadRT);
+                                out.flush();
+                                out.write(bufferRT);
+                                out.flush();
+                                inputRT.close();
+                                finRT.close();
+                                rtFile.delete();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } finally {
+                                fileLock.unlock();
                             }
-
-                            rtFileWriter.close();
-
-                            //Enviar o filesize e o file
-                            FileInputStream finRT = new FileInputStream(rtFile);
-                            InputStream inputRT = new BufferedInputStream(finRT);
-                            byte[] bufferRT = new byte[(int)rtFile.length()];
-                            long bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
-
-                            out.writeObject("OK");
-                            out.writeObject(bytesReadRT);
-                            out.flush();
-                            out.write(bufferRT);
-                            out.flush();
-                            inputRT.close();
-                            finRT.close();
-                            rtFile.delete();
                             break;
                         case "RI":
                             String[] userDataRI = reqSplit[1].split(":");
 
-                            BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
-                            String regReaderLine = regReader.readLine();
-                            LinkedList<String> devs = new LinkedList<String>();
+                            fileLock.lock();
+                            try{
+                                BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+                                String regReaderLine = regReader.readLine();
+                                LinkedList<String> devs = new LinkedList<String>();
 
-                            while (regReaderLine != null){
-                                devs.add(regReaderLine);
-                                regReaderLine = regReader.readLine();
-                            }
+                                while (regReaderLine != null){
+                                    devs.add(regReaderLine);
+                                    regReaderLine = regReader.readLine();
+                                }
 
-                            regReader.close();
+                                regReader.close();
 
-                            if (!devs.contains(reqSplit[1])) {
-                                out.writeObject("NOID # esse device id não existe");
-                                out.flush();
-                                break;
-                            }
+                                if (!devs.contains(reqSplit[1])) {
+                                    out.writeObject("NOID # esse device id não existe");
+                                    out.flush();
+                                    break;
+                                }
 
-                            if (!new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg").exists()) {
-                                out.writeObject("NODATA # nao existem dados de imagem publicados");
-                                out.flush();
-                                break;
-                            }
-                            
-                            boolean hasPerms = false;
+                                if (!new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg").exists()) {
+                                    out.writeObject("NODATA # nao existem dados de imagem publicados");
+                                    out.flush();
+                                    break;
+                                }
+                                
+                                boolean hasPerms = false;
 
-                            if (reqSplit[1].equals(temp[0] + ":" + currDevId)) {
-                                hasPerms = true;
-                            }
-                            else 
-                            {
-                                for (Domain dom : domains) {
-                                    if (dom.getDevices().contains(reqSplit[1])) {
-                                        //Check read perms
-                                        if (dom.getUsers().contains(temp[0])) {
-                                            hasPerms = true;
+                                if (reqSplit[1].equals(temp[0] + ":" + currDevId)) {
+                                    hasPerms = true;
+                                }
+                                else 
+                                {
+                                    for (Domain dom : domains) {
+                                        if (dom.getDevices().contains(reqSplit[1])) {
+                                            //Check read perms
+                                            if (dom.getUsers().contains(temp[0])) {
+                                                hasPerms = true;
+                                            }
                                         }
                                     }
                                 }
+
+                                if (!hasPerms) {
+                                    out.writeObject("NOPERM # sem permissoes de leitura");
+                                    out.flush();
+                                    break;
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            } finally {
+                                fileLock.unlock();
                             }
 
-                            if (!hasPerms) {
-                                out.writeObject("NOPERM # sem permissoes de leitura");
-                                out.flush();
-                                break;
-                            }
-
+                            fileLock.lock();
                             try (
                                 FileInputStream fileInputStream = new FileInputStream(userDataRI[0] + "_" + userDataRI[1] + ".jpg")) {
 
@@ -542,7 +594,10 @@ public class IoTServer {
                             } catch (IOException e) {
                                 System.out.println("An error occurred: " + e.getMessage());
                                 e.printStackTrace();
+                            } finally {
+                                fileLock.unlock();
                             }
+
                             break;
                         default:     
                             out.writeObject("Pedido Invalido!");
@@ -562,16 +617,23 @@ public class IoTServer {
 
                 LinkedList<Integer> newUserDevIds = new LinkedList<>();
 
-                //Escrever no credentials file
-                BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
-                myWriterUsers.write(login + System.getProperty("line.separator"));
-                myWriterUsers.close();
-                userCredentials.put(user, password);
+                fileLock.lock();
+                try{
+                    //Escrever no credentials file
+                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                    myWriterUsers.write(login + System.getProperty("line.separator"));
+                    myWriterUsers.close();
+                    userCredentials.put(user, password);
 
-                out.writeObject("OK-NEW-USER");
-                out.flush();
+                    out.writeObject("OK-NEW-USER");
+                    out.flush();
 
-                connected.put(user, newUserDevIds);
+                    connected.put(user, newUserDevIds);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } finally {
+                    fileLock.unlock();
+                }
             }
             else
             {
@@ -610,6 +672,7 @@ public class IoTServer {
             }
 
             //Criar registered devices history ou atualizar
+            fileLock.lock();
             regHist = new File("registeredDevices.txt");
             try {
                 if (regHist.createNewFile()) {
@@ -620,40 +683,49 @@ public class IoTServer {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                fileLock.unlock();
             }
 
-            BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
-            String regReaderLine = regReader.readLine();
-            LinkedList<String> devs = new LinkedList<String>();
+            fileLock.lock();
+            try{
+                BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+                String regReaderLine = regReader.readLine();
+                LinkedList<String> devs = new LinkedList<String>();
 
-            while (regReaderLine != null){
-                devs.add(regReaderLine);
-                regReaderLine = regReader.readLine();
+                while (regReaderLine != null){
+                    devs.add(regReaderLine);
+                    regReaderLine = regReader.readLine();
+                }
+
+                regReader.close();
+
+                if (!devs.contains(user + ":" + dev_id)) {
+                    devs.add(user + ":" + dev_id);
+                }
+                else 
+                {
+                    System.out.println("Device already registered.");
+                }
+
+                regHist.delete();
+                regHist = new File("registeredDevices.txt");
+
+                BufferedWriter myWriterRegs = new BufferedWriter(new FileWriter(regHist, true));
+
+                for (String s : devs) {
+                    myWriterRegs.write(s + System.getProperty("line.separator"));
+                }
+
+                myWriterRegs.close();
+
+                out.writeObject("OK-DEVID");
+                out.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                fileLock.unlock();
             }
-
-            regReader.close();
-
-            if (!devs.contains(user + ":" + dev_id)) {
-                devs.add(user + ":" + dev_id);
-            }
-            else 
-            {
-                System.out.println("Device already registered.");
-            }
-
-            regHist.delete();
-            regHist = new File("registeredDevices.txt");
-
-            BufferedWriter myWriterRegs = new BufferedWriter(new FileWriter(regHist, true));
-
-            for (String s : devs) {
-                myWriterRegs.write(s + System.getProperty("line.separator"));
-            }
-
-            myWriterRegs.close();
-
-            out.writeObject("OK-DEVID");
-            out.flush();
 
             return dev_id;
         }
@@ -661,6 +733,7 @@ public class IoTServer {
         private static boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progName, long progSize) {
             boolean retval = false;
 
+            fileLock.lock();
             try {
                 BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
                 String line = progInfoReader.readLine();
@@ -681,45 +754,53 @@ public class IoTServer {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                fileLock.unlock();
             }
 
             return retval;
         }
 
         private static void updateDomainsFile() throws IOException {
-            
-            domainsInfo.delete();
-            domainsInfo = new File("domainsInfo.txt");
-
-            BufferedWriter myWriterDomains = new BufferedWriter(new FileWriter(domainsInfo, true));
-
-            for (Domain d : domains) {
-                LinkedList<String> usersDom = d.getUsers();
-                StringBuilder stringBuilderUsers = new StringBuilder();
-                StringBuilder stringBuilderDevices = new StringBuilder();
-
-                for (String s : usersDom) {
-                    stringBuilderUsers.append(s + " ");
-                }
-
-                myWriterDomains.write(d.getName() + " (Users): " + stringBuilderUsers.toString() + System.getProperty("line.separator"));
-
-                if (d.getDevices() != null) {
-                    LinkedList<String> devicesDom = d.getDevices();
-
-                    for (String s : devicesDom) {
-                        stringBuilderDevices.append(s + " ");
+            fileLock.lock();
+            try{
+                domainsInfo.delete();
+                domainsInfo = new File("domainsInfo.txt");
+    
+                BufferedWriter myWriterDomains = new BufferedWriter(new FileWriter(domainsInfo, true));
+    
+                for (Domain d : domains) {
+                    LinkedList<String> usersDom = d.getUsers();
+                    StringBuilder stringBuilderUsers = new StringBuilder();
+                    StringBuilder stringBuilderDevices = new StringBuilder();
+    
+                    for (String s : usersDom) {
+                        stringBuilderUsers.append(s + " ");
                     }
-
-                    myWriterDomains.write(d.getName() + " (Devices): " + stringBuilderDevices.toString() + System.getProperty("line.separator"));
+    
+                    myWriterDomains.write(d.getName() + " (Users): " + stringBuilderUsers.toString() + System.getProperty("line.separator"));
+    
+                    if (d.getDevices() != null) {
+                        LinkedList<String> devicesDom = d.getDevices();
+    
+                        for (String s : devicesDom) {
+                            stringBuilderDevices.append(s + " ");
+                        }
+    
+                        myWriterDomains.write(d.getName() + " (Devices): " + stringBuilderDevices.toString() + System.getProperty("line.separator"));
+                    }
+                    else 
+                    {
+                        myWriterDomains.write(d.getName() + " (Devices): " + System.getProperty("line.separator"));
+                    }
                 }
-                else 
-                {
-                    myWriterDomains.write(d.getName() + " (Devices): " + System.getProperty("line.separator"));
-                }
+    
+                myWriterDomains.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                fileLock.unlock();
             }
-
-            myWriterDomains.close();
         }
 
         public void ei(String fileName, String name, int devid,ObjectInputStream in, ObjectOutputStream out){
@@ -737,7 +818,9 @@ public class IoTServer {
             if (!rec.equals("found")) {
                 return;
             }
-    
+
+
+            fileLock.lock();
             try {
                 // Receive file size from client
                 int fileSize = in.readInt();
@@ -753,13 +836,12 @@ public class IoTServer {
                 if (totalBytesRead != fileSize) {
                     throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
                 }
-                
                 if (fileName.endsWith(".jpg")) {
                     // Write received file data to the destination file
                     FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
                     fileOutputStream.write(buffer, 0, totalBytesRead);
                     fileOutputStream.close();
-        
+
                     System.out.println("File received from client and saved successfully.");
 
                     out.writeObject("OK");
@@ -775,6 +857,8 @@ public class IoTServer {
             } catch (IOException e) {
                 System.out.println("An error occurred: " + e.getMessage());
                 e.printStackTrace();
+            } finally {
+                fileLock.unlock();
             }
         }
     }

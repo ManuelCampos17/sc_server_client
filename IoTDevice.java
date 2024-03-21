@@ -9,20 +9,12 @@
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
 import java.net.Socket;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.BufferedInputStream;
-import java.io.InputStream;
 import java.util.Scanner;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
 
 // --------------------------------- //
 // --------------------------------- //
@@ -208,7 +200,6 @@ public class IoTDevice {
                     if (!retEi) {
                         continue;
                     }
-                    
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
@@ -271,7 +262,9 @@ public class IoTDevice {
                         }
 
                         String fileContent = new String(buffer);
-                        System.out.println(srvResponse + ", " + fileSize + " (long)," + fileContent);
+                        System.out.println(srvResponse + ", " + fileSize + " (long)");
+                    }else{
+                        System.out.println(srvResponse);
                     }
 
                 } else {
@@ -310,26 +303,22 @@ public class IoTDevice {
             File file = new File(sourceFileName);
             int fileSize = (int) file.length();
             byte[] fileData = new byte[fileSize];
-
             // Read the entire file into memory
             int bytesRead = 0;
             while (bytesRead < fileSize) {
                 bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
             }
-
             // Write the file size to the output stream
             out.writeInt(fileSize);
-
             // Write the file data to the output stream
             out.write(fileData);
             out.flush(); // Ensure all data is sent
-
             //close
             fileInputStream.close();
-            
+
             System.out.println("File sent to server successfully.");
             return true;
-            
+
         } catch (FileNotFoundException e) {
             System.out.println("Image file not found, select a valid image.");
 
