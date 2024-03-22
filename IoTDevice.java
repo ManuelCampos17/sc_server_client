@@ -273,7 +273,7 @@ public class IoTDevice {
             }
 
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("Disconnecting from Server...");
         }
     }
 
