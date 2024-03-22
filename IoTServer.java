@@ -254,7 +254,7 @@ public class IoTServer {
                     out.close();
                     in.close();
                     clientSocket.close();
-                    System.out.println("User " + temp[0] + ":" + currDevId + " disconnected.");
+                    System.out.println("User " + temp[0] + "_" + currDevId + " disconnected.");
                     return;
                 }
                 
@@ -793,7 +793,7 @@ public class IoTServer {
                         stringBuilderUsers.append(s + " ");
                     }
     
-                    myWriterDomains.write(d.getName() + " (Users): " + stringBuilderUsers.toString() + System.getProperty("line.separator"));
+                    myWriterDomains.write(d.getName() + " (Users):" + stringBuilderUsers.toString() + System.getProperty("line.separator"));
     
                     if (d.getDevices() != null) {
                         LinkedList<String> devicesDom = d.getDevices();
@@ -802,11 +802,11 @@ public class IoTServer {
                             stringBuilderDevices.append(s + " ");
                         }
     
-                        myWriterDomains.write(d.getName() + " (Devices): " + stringBuilderDevices.toString() + System.getProperty("line.separator"));
+                        myWriterDomains.write(d.getName() + " (Devices):" + stringBuilderDevices.toString() + System.getProperty("line.separator"));
                     }
                     else 
                     {
-                        myWriterDomains.write(d.getName() + " (Devices): " + System.getProperty("line.separator"));
+                        myWriterDomains.write(d.getName() + " (Devices):" + System.getProperty("line.separator"));
                     }
                 }
     
