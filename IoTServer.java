@@ -223,6 +223,8 @@ public class IoTServer {
     static class ClientHandler implements Runnable {
         private Socket clientSocket;
 
+        //Para remover do connected
+        private String currUser;
 
         public ClientHandler(Socket clientSocket) {
             this.clientSocket = clientSocket;
@@ -237,6 +239,7 @@ public class IoTServer {
                 System.out.println("Client connected");
                 String login = (String) in.readObject();
                 String[] temp = login.split(":");
+                currUser = temp[0];
 
                 //Handle Auth
                 handleAuth(in, out, login, temp[0], temp[1]);
@@ -380,7 +383,7 @@ public class IoTServer {
                             } finally {
                                 serverLock.unlock();
                             }
-                            
+
                             break;
                         case "RD":
                             serverLock.lock();
@@ -628,6 +631,10 @@ public class IoTServer {
                 }
             } catch (SocketException e) {
                 System.out.println(("Client disconnected: " + e.getMessage()));
+                
+                if (connected.containsKey(currUser)) {
+                    connected.remove(currUser);
+                }
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
