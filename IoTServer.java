@@ -360,7 +360,13 @@ public class IoTServer {
                                     out.flush();
                                     break;
                                 }
-    
+                                
+                                if (selectedDomADD.getUsers().contains(reqSplit[1])) {
+                                    out.writeObject("NOK # o user ja se encontra no dominio");
+                                    out.flush();
+                                    break;
+                                }
+
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
                                 domains.add(selectedDomADD);
@@ -374,6 +380,7 @@ public class IoTServer {
                             } finally {
                                 serverLock.unlock();
                             }
+                            
                             break;
                         case "RD":
                             serverLock.lock();
