@@ -558,7 +558,7 @@ public class IoTServer {
                                 else 
                                 {
                                     for (Domain dom : domains) {
-                                        if (dom.getDevices().contains(reqSplit[1])) {
+                                        if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1])) {
                                             //Check read perms
                                             if (dom.getUsers().contains(temp[0])) {
                                                 hasPerms = true;
