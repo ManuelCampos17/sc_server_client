@@ -122,6 +122,8 @@ public class IoTDevice {
                 System.out.println("File tested");
             }
 
+            System.out.println();
+            System.out.println();
             // Mostrar menu de opções
             System.out.println("Menu de Opções:");
             System.out.println("CREATE <dm> # Criar domínio - utilizador é Owner");
@@ -134,8 +136,9 @@ public class IoTDevice {
             System.out.println(
                     "RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
 
+            System.out.println();
             while (true) {
-
+                System.out.println("--------------------------------------------------");
                 System.out.println("Enter command:");
                 String command = sc.nextLine();
                 String[] parts = command.split(" ");

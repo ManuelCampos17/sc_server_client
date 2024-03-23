@@ -61,7 +61,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:7205");
+                myWriterClient.write("IoTDevice.class:7306");
                 myWriterClient.close();
             } else 
             {
@@ -632,9 +632,15 @@ public class IoTServer {
             } catch (SocketException e) {
                 System.out.println(("Client disconnected: " + e.getMessage()));
                 
-                if (connected.containsKey(currUser)) {
-                    connected.remove(currUser);
+                serverLock.lock();
+                try{
+                    if (connected.containsKey(currUser)) {
+                        connected.remove(currUser);
+                    }
+                } finally {
+                    serverLock.unlock();
                 }
+                
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
