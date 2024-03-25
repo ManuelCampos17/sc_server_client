@@ -13,6 +13,7 @@ import java.net.Socket;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.util.Scanner;
 
@@ -248,24 +249,13 @@ public class IoTDevice {
                         out.writeObject("RI" + " " + parts[1]);
                         out.flush();
                     }
+
                     srvResponse = (String) in.readObject();
 
+                    String[] reqUser = parts[1].split(":");
+
                     if (srvResponse.startsWith("OK")) {
-                        long fileSize = in.readLong();
-
-                        byte[] buffer = new byte[(int) fileSize];
-
-                        int bytesRead = 0;
-                        int count;
-                        while (bytesRead < fileSize) {
-                            count = in.read(buffer);
-                            if (count == -1)
-                                break;
-                            bytesRead += count;
-                        }
-
-                        String fileContent = new String(buffer);
-                        System.out.println(srvResponse + ", " + fileSize + " (long)");
+                        ri(reqUser[0], Integer.parseInt(reqUser[1]), in, out);
                     }else{
                         System.out.println(srvResponse);
                     }
@@ -339,4 +329,35 @@ public class IoTDevice {
             return false;
         }
     }
+
+    public static synchronized void ri(String name, int devid, ObjectInputStream in, ObjectOutputStream out){
+            String destinationFileName = name + "_" + devid + "_received" + ".jpg";
+
+            try {
+                // Receive file size from client
+                int fileSize = in.readInt();
+    
+                // Create buffer to read file data
+                byte[] buffer = new byte[fileSize];
+                int totalBytesRead = 0;
+                int bytesRead;
+                while (totalBytesRead < fileSize && (bytesRead = in.read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
+                    totalBytesRead += bytesRead;
+                }
+    
+                if (totalBytesRead != fileSize) {
+                    throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
+                }
+
+                // Write received file data to the destination file
+                FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
+                fileOutputStream.write(buffer, 0, totalBytesRead);
+                fileOutputStream.close();
+
+                System.out.println("OK, " + fileSize + " (long)");
+            } catch (IOException e) {
+                System.out.println("An error occurred: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
 }

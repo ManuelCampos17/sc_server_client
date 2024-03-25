@@ -25,7 +25,7 @@ domainsInfo.txt --> Ficheiro que guarda informações sobre os dominios e os res
 
 tempsFile.txt --> Ficheiro que guarda as últimas temperaturas enviadas pelos <users>
 
-
+registeredDevices.txt --> Ficheiro que guarda os devices que já se autenticaram pela primeira vez
 
 
 Persistência: <Volatile & Locks> para não comprometer a thread safety.

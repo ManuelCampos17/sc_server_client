@@ -61,7 +61,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:7306");
+                myWriterClient.write("IoTDevice.class:7899");
                 myWriterClient.close();
             } else 
             {
@@ -589,34 +589,10 @@ public class IoTServer {
                             }
 
                             serverLock.lock();
-                            try (
-                                FileInputStream fileInputStream = new FileInputStream(userDataRI[0] + "_" + userDataRI[1] + ".jpg")) {
 
-                                // Get the file size
-                                File file = new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg");
-                                int fileSize = (int) file.length();
-                                byte[] fileData = new byte[fileSize];
-
-                                // Read the entire file into memory
-                                int bytesRead = 0;
-                                while (bytesRead < fileSize) {
-                                    bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
-                                }
-
-                                out.writeObject("OK");
-                                // Write the file size to the output stream
-                                out.writeLong(fileSize);
-
-                                // Write the file data to the output stream
-                                out.write(fileData);
-                                out.flush(); // Ensure all data is sent
-
-                                //close
-                                fileInputStream.close();
-                                
-                                System.out.println("File sent to client successfully.");
-                                
-                            } catch (IOException e) {
+                            try {
+                                ri(userDataRI[0] + "_" + userDataRI[1] + ".jpg", in, out);
+                            } catch (Exception e) {
                                 System.out.println("An error occurred: " + e.getMessage());
                                 e.printStackTrace();
                             } finally {
@@ -894,6 +870,37 @@ public class IoTServer {
                 e.printStackTrace();
             } finally {
                 serverLock.unlock();
+            }
+        }
+
+        public static void ri(String sourceFileName, ObjectInputStream in, ObjectOutputStream out){
+            try (
+                 FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
+                
+                out.writeObject("OK");
+                out.flush();
+    
+                // Get the file size
+                File file = new File(sourceFileName);
+                int fileSize = (int) file.length();
+                byte[] fileData = new byte[fileSize];
+                // Read the entire file into memory
+                int bytesRead = 0;
+                while (bytesRead < fileSize) {
+                    bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
+                }
+                // Write the file size to the output stream
+                out.writeInt(fileSize);
+                // Write the file data to the output stream
+                out.write(fileData);
+                out.flush(); // Ensure all data is sent
+                //close
+                fileInputStream.close();
+    
+                System.out.println("File sent to client successfully.");
+            } catch (Exception e) {
+                System.out.println("An error occurred: " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }
