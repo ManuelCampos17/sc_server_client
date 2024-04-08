@@ -33,6 +33,7 @@ Persistência: <Volatile & Locks> para não comprometer a thread safety.
 
 EI: O comando EI serve para enviar uma imagem do cliente para o servidor. Para facilitar a sua alocação a imagem em formato .jpg irá ter o nome: "user_devid.jpg", assim garantimos que apenas é guardada a última imagem e que a mesma é facilmente identificada.
 
+
 --------------------------------------------------------------------------------------------------------------------
 
 
