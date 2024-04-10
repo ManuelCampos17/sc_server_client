@@ -2,6 +2,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.KeyPair;
+import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -18,6 +20,12 @@ import java.util.LinkedList;
 public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
     private static Lock serverLock = new ReentrantLock();
+
+    private static int port;
+    private static String pass_cypher;
+    private static KeyPair sv_keys;
+    private static String pass_keystore;
+    private static String apiKey;
 
     //User -> Password
     private static volatile Map<String, String> userCredentials = new HashMap<>();
@@ -47,10 +55,26 @@ public class IoTServer {
     private static File regHist;
 
     public static void main(String[] args) {
-        int port = DEFAULT_PORT;
-        if (args.length > 0) {
-            port = Integer.parseInt(args[0]);
+        port = DEFAULT_PORT;
+
+        if (args.length !=  5) {
+            System.out.println("Formato: IoTServer <port> <password-cifra> <keystore> <password-keystore> <2FA-APIKey>");
+            return;
         }
+
+        port = Integer.parseInt(args[0]);
+        pass_cypher = args[1];
+        pass_keystore = args[3];
+
+        try {
+            FileInputStream kStoreFile = new FileInputStream(args[2]);
+            KeyStore kstore = KeyStore.getInstance("RSA");
+            kstore.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        apiKey = args[4];
 
         //Criar size e nome do client executable caso nao exista
         serverLock.lock();
