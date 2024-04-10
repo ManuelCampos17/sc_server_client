@@ -58,6 +58,8 @@ public class IoTServer {
         }
 
         // TLS/SSL
+        System.setProperty("javax.net.ssl.keyStore", "C:/Manel/sc_server_client/serverKeys");
+        System.setProperty("javax.net.ssl.keyStorePassword", "grupo15");
         SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
 
 

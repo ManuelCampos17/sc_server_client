@@ -58,6 +58,11 @@ public class IoTDevice {
                 port = Integer.parseInt(addr[1]);
             }
 
+            //Setup do TLS/SSL
+
+            System.setProperty("javax.net.ssl.trustStore", "cliTruststore");
+            System.setProperty("javax.net.ssl.trustStorePassword", "grupo15");
+
             SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
             clientSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, port);
             clientSocket.setEnabledProtocols(protocols);
