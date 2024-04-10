@@ -57,7 +57,7 @@ public class IoTServer {
     public static void main(String[] args) {
         port = DEFAULT_PORT;
 
-        if (args.length !=  5) {
+        if (args.length != 5) {
             System.out.println("Formato: IoTServer <port> <password-cifra> <keystore> <password-keystore> <2FA-APIKey>");
             return;
         }
@@ -68,7 +68,7 @@ public class IoTServer {
 
         try {
             FileInputStream kStoreFile = new FileInputStream(args[2]);
-            KeyStore kstore = KeyStore.getInstance("RSA");
+            KeyStore kstore = KeyStore.getInstance("JCEKS");
             kstore.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
         } catch (Exception e) {
             e.printStackTrace();

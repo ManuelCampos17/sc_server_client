@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.cert.Certificate;
+import java.security.KeyStore;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -29,6 +31,11 @@ public class IoTDevice {
     private static Socket clientSocket;
     private static ObjectOutputStream out;
     private static ObjectInputStream in;
+
+    private static final int DEFAULT_PORT = 12345;
+    private static KeyStore kstore;
+    private static KeyStore tstore;
+
     public static void main(String[] args) {
         try {
             System.out.println("Client Initializing...");
@@ -41,10 +48,18 @@ public class IoTDevice {
 
             // Iniciar a ligação ao servidor
             String serverAddress;
-            int port = 12345;
+            int port = DEFAULT_PORT;
             String[] addr = args[0].split(":");
-            int devId = Integer.parseInt(args[1]);
-            String userId = args[2];
+            int devId = Integer.parseInt(args[4]);
+            String userId = args[5];
+
+            FileInputStream tfile = new FileInputStream(args[1]);  //truststore
+            FileInputStream kfile = new FileInputStream(args[2]);  //keystore
+
+            kstore = KeyStore.getInstance("JCEKS");
+            tstore = KeyStore.getInstance("JCEKS");
+
+            kstore.load(kfile, args[3].toCharArray());           //password para aceder à keystore
 
             if (addr.length == 1) {
                 serverAddress = addr[0];
@@ -52,6 +67,7 @@ public class IoTDevice {
                 serverAddress = addr[0];
                 port = Integer.parseInt(addr[1]);
             }
+            
             clientSocket = new Socket(serverAddress, port);
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
@@ -271,10 +287,10 @@ public class IoTDevice {
     }
 
     public static boolean argsCheck(String[] args) {
-        if (args.length != 3) {
+        if (args.length != 6) {
             System.out.println("---------------------------------");
             System.out.println("--Incorrect number of arguments--");
-            System.out.println("--> IoTDevice <serverAddress> <dev-id> <user-id> <--");
+            System.out.println("--> IoTDevice <serverAddress> <truststore> <keystore> <passwordkeystore> <dev-id> <user-id> <--");
             System.out.println("---------------------------------");
             return false;
         }
