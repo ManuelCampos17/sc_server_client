@@ -37,3 +37,6 @@ EI: O comando EI serve para enviar uma imagem do cliente para o servidor. Para f
 --------------------------------------------------------------------------------------------------------------------
 
 
+Keystore: serverKeys,   serverRSA
+
+TrustStore: cliTruststore,  serverCert

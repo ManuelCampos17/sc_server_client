@@ -7,6 +7,9 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
 
 import java.util.LinkedList;
 
@@ -18,6 +21,8 @@ import java.util.LinkedList;
 public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
     private static Lock serverLock = new ReentrantLock();
+    private static final String[] protocols = new String[]{"TLSv1.3"};
+    private static final String[] cipher_suites = new String[]{"TLS_AES_128_GCM_SHA256"};
 
     //User -> Password
     private static volatile Map<String, String> userCredentials = new HashMap<>();
@@ -51,6 +56,10 @@ public class IoTServer {
         if (args.length > 0) {
             port = Integer.parseInt(args[0]);
         }
+
+        // TLS/SSL
+        SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+
 
         //Criar size e nome do client executable caso nao exista
         serverLock.lock();
@@ -90,7 +99,13 @@ public class IoTServer {
         }
 
         serverLock.lock();
-        try (ServerSocket srvSocket = new ServerSocket(port)) {
+        try (SSLServerSocket srvSocket = (SSLServerSocket) factory.createServerSocket(port)) {
+
+            //parte do protocolo TLS/SSL
+            srvSocket.setEnabledProtocols(protocols);
+            srvSocket.setEnabledCipherSuites(cipher_suites);
+
+
             System.out.println("Server initialized on port: " + port);
 
             //Criar user file caso nao exista
@@ -210,23 +225,28 @@ public class IoTServer {
                 serverLock.unlock();
             }
 
+
+
+            // Começa aqui a comunicação com os clientes
             while (true){
-                Socket cliSocket = srvSocket.accept();
+                SSLSocket cliSocket = (SSLSocket) srvSocket.accept();
                 ClientHandler ch = new ClientHandler(cliSocket);
                 new Thread(ch).start();
             }
+
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     static class ClientHandler implements Runnable {
-        private Socket clientSocket;
+        private SSLSocket clientSocket;
 
         //Para remover do connected
         private String currUser;
 
-        public ClientHandler(Socket clientSocket) {
+        public ClientHandler(SSLSocket clientSocket) {
             this.clientSocket = clientSocket;
         }
 

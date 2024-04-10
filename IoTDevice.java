@@ -17,6 +17,9 @@ import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
 import java.util.Scanner;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+
 // --------------------------------- //
 // --------------------------------- //
 // --------------------------------- //
@@ -26,7 +29,9 @@ import java.util.Scanner;
 // --------------------------------- //
 public class IoTDevice {
 
-    private static Socket clientSocket;
+    private static final String[] protocols = new String[]{"TLSv1.3"};
+    private static final String[] cipher_suites = new String[]{"TLS_AES_128_GCM_SHA256"};
+    private static SSLSocket clientSocket;
     private static ObjectOutputStream out;
     private static ObjectInputStream in;
     public static void main(String[] args) {
@@ -52,7 +57,14 @@ public class IoTDevice {
                 serverAddress = addr[0];
                 port = Integer.parseInt(addr[1]);
             }
-            clientSocket = new Socket(serverAddress, port);
+
+            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            clientSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, port);
+            clientSocket.setEnabledProtocols(protocols);
+            clientSocket.setEnabledCipherSuites(cipher_suites);
+
+            clientSocket.startHandshake(); 
+
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
 
