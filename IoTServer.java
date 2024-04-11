@@ -71,6 +71,9 @@ public class IoTServer {
             return;
         }
 
+        // TLS/SSL
+        String keyStore = args[2];
+
         port = Integer.parseInt(args[0]);
         pass_cypher = args[1];
         pass_keystore = args[3];
@@ -85,9 +88,6 @@ public class IoTServer {
 
         apiKey = args[4];
 
-        // TLS/SSL
-        String keyStore = "serverstore.jks"; // "serverstore.jks
-        String password = "grupoquinze";
 
 
         //Criar size e nome do client executable caso nao exista
@@ -128,7 +128,7 @@ public class IoTServer {
         }
 
         serverLock.lock();
-        try (SSLServerSocket srvSocket = Utils.initializeServer(keyStore, password, port)) {
+        try (SSLServerSocket srvSocket = Utils.initializeServer(keyStore, pass_keystore, port)) {
 
 
             System.out.println("Server initialized on port: " + port);
