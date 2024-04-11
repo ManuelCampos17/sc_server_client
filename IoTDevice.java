@@ -66,8 +66,8 @@ public class IoTDevice {
             FileInputStream tfile = new FileInputStream(args[1]);  //truststore
             FileInputStream kfile = new FileInputStream(args[2]);  //keystore
 
-            kstore = KeyStore.getInstance("JCEKS");
-            tstore = KeyStore.getInstance("JCEKS");
+            kstore = KeyStore.getInstance("PKCS12");
+            tstore = KeyStore.getInstance("PKCS12");
 
             char[] kstorepass = args[3].toCharArray();
 
@@ -81,8 +81,8 @@ public class IoTDevice {
             }
 
             //Setup do TLS/SSL
-            String trustStore = "cliTruststore.jks";
-            String trustStorePassword = "grupoquinze";
+            String trustStore = args[1];
+            String trustStorePassword = args[3]; // Mudar, para já é igual à password da keystore
 
             clientSocket = Utils.initializeClient(trustStore, trustStorePassword, serverAddress, port);
             clientSocket.startHandshake();
