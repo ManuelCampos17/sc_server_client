@@ -21,8 +21,6 @@ import java.util.LinkedList;
 public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
     private static Lock serverLock = new ReentrantLock();
-    private static final String[] protocols = new String[]{"TLSv1.3"};
-    private static final String[] cipher_suites = new String[]{"TLS_AES_128_GCM_SHA256"};
 
     //User -> Password
     private static volatile Map<String, String> userCredentials = new HashMap<>();
@@ -58,9 +56,8 @@ public class IoTServer {
         }
 
         // TLS/SSL
-        System.setProperty("javax.net.ssl.keyStore", "C:/Manel/sc_server_client/serverKeys");
-        System.setProperty("javax.net.ssl.keyStorePassword", "grupo15");
-        SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+        String keyStore = "serverstore.jks"; // "serverstore.jks
+        String password = "grupoquinze";
 
 
         //Criar size e nome do client executable caso nao exista
@@ -72,7 +69,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:7899");
+                myWriterClient.write("IoTDevice.class:8136");
                 myWriterClient.close();
             } else 
             {
@@ -101,11 +98,7 @@ public class IoTServer {
         }
 
         serverLock.lock();
-        try (SSLServerSocket srvSocket = (SSLServerSocket) factory.createServerSocket(port)) {
-
-            //parte do protocolo TLS/SSL
-            srvSocket.setEnabledProtocols(protocols);
-            srvSocket.setEnabledCipherSuites(cipher_suites);
+        try (SSLServerSocket srvSocket = Utils.initializeServer(keyStore, password, port)) {
 
 
             System.out.println("Server initialized on port: " + port);

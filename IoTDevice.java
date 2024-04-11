@@ -29,8 +29,6 @@ import javax.net.ssl.SSLSocketFactory;
 // --------------------------------- //
 public class IoTDevice {
 
-    private static final String[] protocols = new String[]{"TLSv1.3"};
-    private static final String[] cipher_suites = new String[]{"TLS_AES_128_GCM_SHA256"};
     private static SSLSocket clientSocket;
     private static ObjectOutputStream out;
     private static ObjectInputStream in;
@@ -59,16 +57,13 @@ public class IoTDevice {
             }
 
             //Setup do TLS/SSL
+            String trustStore = "cliTruststore.jks";
+            String trustStorePassword = "grupoquinze";
 
-            System.setProperty("javax.net.ssl.trustStore", "cliTruststore");
-            System.setProperty("javax.net.ssl.trustStorePassword", "grupo15");
+            clientSocket = Utils.initializeClient(trustStore, trustStorePassword, serverAddress, port);
+            clientSocket.startHandshake();
 
-            SSLSocketFactory sslSocketFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-            clientSocket = (SSLSocket) sslSocketFactory.createSocket(serverAddress, port);
-            clientSocket.setEnabledProtocols(protocols);
-            clientSocket.setEnabledCipherSuites(cipher_suites);
-
-            clientSocket.startHandshake(); 
+            // Inicializar os streams
 
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
