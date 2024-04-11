@@ -2,6 +2,14 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -21,6 +29,12 @@ import java.util.LinkedList;
 public class IoTServer {
     private static final int DEFAULT_PORT = 12345;
     private static Lock serverLock = new ReentrantLock();
+
+    private static int port;
+    private static String pass_cypher;
+    private static KeyPair sv_keys;
+    private static String pass_keystore;
+    private static String apiKey;
 
     //User -> Password
     private static volatile Map<String, String> userCredentials = new HashMap<>();
@@ -50,10 +64,26 @@ public class IoTServer {
     private static File regHist;
 
     public static void main(String[] args) {
-        int port = DEFAULT_PORT;
-        if (args.length > 0) {
-            port = Integer.parseInt(args[0]);
+        port = DEFAULT_PORT;
+
+        if (args.length != 5) {
+            System.out.println("Formato: IoTServer <port> <password-cifra> <keystore> <password-keystore> <2FA-APIKey>");
+            return;
         }
+
+        port = Integer.parseInt(args[0]);
+        pass_cypher = args[1];
+        pass_keystore = args[3];
+
+        try {
+            FileInputStream kStoreFile = new FileInputStream(args[2]);
+            KeyStore kstore = KeyStore.getInstance("JCEKS");
+            kstore.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        apiKey = args[4];
 
         // TLS/SSL
         String keyStore = "serverstore.jks"; // "serverstore.jks
@@ -252,12 +282,87 @@ public class IoTServer {
                 ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
             ) {
                 System.out.println("Client connected");
-                String login = (String) in.readObject();
-                String[] temp = login.split(":");
-                currUser = temp[0];
+                String userId = (String) in.readObject();
 
-                //Handle Auth
-                handleAuth(in, out, login, temp[0], temp[1]);
+                //OLD
+                // String[] temp = login.split(":");
+                // currUser = temp[0];
+
+                byte[] nonce;
+                boolean isRegistered = verifyUser(userId);
+
+                try {
+                    // Enviar nonce para o cliente
+                    nonce = generateNonce();
+                    out.writeObject(nonce);
+                    out.flush();
+                    
+                    if (isRegistered) {
+                        out.writeObject("registered");
+
+                        byte[] signedNonce = (byte[]) in.readObject();
+
+                        FileInputStream fis = new FileInputStream("certificadoDoUser.cer");
+                        CertificateFactory cf = CertificateFactory.getInstance("X509");
+                        Certificate cert = cf.generateCertificate(fis);
+                        PublicKey userPubKey = cert.getPublicKey();
+
+                        Signature s = Signature.getInstance("MD5withRSA");
+                        s.initVerify(userPubKey);
+                        s.update(nonce);
+                        boolean verifySig = s.verify(signedNonce);
+
+                        if (verifySig) {
+                            out.writeObject("checkedvalid");
+                            out.flush();
+                        }
+                        else 
+                        {
+                            out.writeObject("checkedinvalid");
+                            out.flush();
+                        }
+                    } else {
+                        out.writeObject("notregistered");
+
+                        byte[] recNonce = (byte[]) in.readObject();
+                        byte[] recSignature = (byte[]) in.readObject();
+                        Certificate recCertificate = (Certificate) in.readObject();
+                        PublicKey recPubKey = recCertificate.getPublicKey();
+
+                        Signature s = Signature.getInstance("MD5withRSA");
+                        s.initVerify(recPubKey);
+                        s.update(recNonce);
+                        boolean verifySig = s.verify(recSignature);
+
+                        if (recNonce == nonce && verifySig) {
+                            out.writeObject("checkedvalid");
+                            out.flush();
+
+                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                            myWriterUsers.write(userId + ":" + "nomeFicheiroComCertDoUser" + System.getProperty("line.separator"));
+                            myWriterUsers.close();
+                            userCredentials.put(userId, "nomeFicheiroComCertDoUser");
+
+                            LinkedList<Integer> newUserDevIds = new LinkedList<>();
+
+                            connected.put(userId, newUserDevIds);
+                        }
+                        else 
+                        {
+                            out.writeObject("checkedinvalid");
+                            out.flush();
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                //Handle Auth (OLD)
+                //handleAuth(in, out, login, temp[0], temp[1]);
+
+                //PLACEHOLDER PARA TIRAR OS ERROS POR CAUSA DO LOGIN COM PASSWORD - DEPOIS RESOLVER
+                String placeholder = "aaaaa";
+                String[] temp = placeholder.split(" ");
 
                 //Handle Auth Dev-id
                 int dev_id = (int) in.readObject();
@@ -635,6 +740,33 @@ public class IoTServer {
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
+        }
+
+        private static byte[] generateNonce() throws NoSuchAlgorithmException {
+            SecureRandom secureRandom = SecureRandom.getInstanceStrong();
+            byte[] nonce = new byte[8];
+            secureRandom.nextBytes(nonce);
+            return nonce;
+        }
+
+        private static boolean verifyUser(String userId) {
+            try {
+                BufferedReader rb = new BufferedReader(new FileReader("userCredentials.txt"));
+                String line = rb.readLine();
+
+                while (line != null){
+                    if (line.equals(userId)) {
+                        rb.close();
+                        return true;
+                    }
+                }
+
+                rb.close();
+            } catch (Exception e) {
+                System.out.println("Erro: " + e);
+            }
+
+            return false;
         }
 
         private static synchronized void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {

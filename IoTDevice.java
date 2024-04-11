@@ -10,11 +10,20 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.util.Scanner;
 
 import javax.net.ssl.SSLSocket;
@@ -32,6 +41,11 @@ public class IoTDevice {
     private static SSLSocket clientSocket;
     private static ObjectOutputStream out;
     private static ObjectInputStream in;
+
+    private static final int DEFAULT_PORT = 12345;
+    private static KeyStore kstore;
+    private static KeyStore tstore;
+
     public static void main(String[] args) {
         try {
             System.out.println("Client Initializing...");
@@ -44,10 +58,20 @@ public class IoTDevice {
 
             // Iniciar a ligação ao servidor
             String serverAddress;
-            int port = 12345;
+            int port = DEFAULT_PORT;
             String[] addr = args[0].split(":");
-            int devId = Integer.parseInt(args[1]);
-            String userId = args[2];
+            int devId = Integer.parseInt(args[4]);
+            String userId = args[5];
+
+            FileInputStream tfile = new FileInputStream(args[1]);  //truststore
+            FileInputStream kfile = new FileInputStream(args[2]);  //keystore
+
+            kstore = KeyStore.getInstance("JCEKS");
+            tstore = KeyStore.getInstance("JCEKS");
+
+            char[] kstorepass = args[3].toCharArray();
+
+            kstore.load(kfile, kstorepass);           //password para aceder à keystore
 
             if (addr.length == 1) {
                 serverAddress = addr[0];
@@ -73,22 +97,64 @@ public class IoTDevice {
             String password = sc.nextLine();
 
             // Enviar a password
-            out.writeObject(userId + ":" + password);
+            // out.writeObject(userId + ":" + password); (OLD)
+            out.writeObject(userId);
             out.flush();
 
-            String msgPass = (String) in.readObject();
+            // String msgPass = (String) in.readObject(); (OLD)
 
-            // Loop para verificar a password
-            while (msgPass.equals("WRONG-PWD")) {
-                System.out.println("Password Errada");
-                System.out.print("Insere a tua Password: ");
-                password = sc.nextLine();
-                out.writeObject(password);
-                out.flush();
-                msgPass = (String) in.readObject();
+            byte[] nonce = (byte[]) in.readObject();
+            String regStatus = (String) in.readObject();
+
+            // Loop para verificar a password (OLD)
+            // while (msgPass.equals("WRONG-PWD")) {
+            //     System.out.println("Password Errada");
+            //     System.out.print("Insere a tua Password: ");
+            //     password = sc.nextLine();
+            //     out.writeObject(password);
+            //     out.flush();
+            //     msgPass = (String) in.readObject();
+            // }
+
+            //System.out.println(msgPass);
+
+            // Tratar a resposta do servidor
+            if (regStatus.equals("notregistered")) {
+                System.out.println("Unknown user. Initiating registering process...");
+
+                // Realizar o registro do usuário
+                boolean regSucc = registerUser(nonce, out, in, kstore, kstorepass);
+
+                if (regSucc) {
+                    System.out.println("Registered successfuly.");
+                } else {
+                    System.out.println("Registering error.");
+                    return;
+                }
             }
+            else 
+            {
+                PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kstorepass);
 
-            System.out.println(msgPass);
+                //Assinar nonce
+                Signature sign = Signature.getInstance("MD5withRSA");
+                sign.initSign(privateKey);
+                sign.update(nonce);
+
+                out.writeObject(sign.sign());
+                out.flush();
+
+                String res = (String) in.readObject();
+
+                if (res.equals("checkedvalid")) {
+                    System.out.println("Auth successful.");
+                }
+                else 
+                {
+                    System.out.println("Auth error.");
+                    return;
+                }
+            }
 
             // Enviar o devId
             out.writeObject(devId);
@@ -282,11 +348,48 @@ public class IoTDevice {
         }
     }
 
+    private static boolean registerUser(byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
+        try {
+            PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kpass);
+
+            //Assinar nonce
+            Signature sign = Signature.getInstance("MD5withRSA");
+            sign.initSign(privateKey);
+            sign.update(nonce);
+
+            out.writeObject(nonce);
+            out.flush();
+
+            out.writeObject(sign.sign());
+            out.flush();
+
+            // Certificado
+            Certificate cert = kstore.getCertificate("publicKey");
+
+            out.writeObject(cert);
+            out.flush();
+
+            String res = (String) in.readObject();
+
+            if (res.equals("checkedvalid")) {
+                return true;
+            }
+            else 
+            {
+                return false;
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public static boolean argsCheck(String[] args) {
-        if (args.length != 3) {
+        if (args.length != 6) {
             System.out.println("---------------------------------");
             System.out.println("--Incorrect number of arguments--");
-            System.out.println("--> IoTDevice <serverAddress> <dev-id> <user-id> <--");
+            System.out.println("--> IoTDevice <serverAddress> <truststore> <keystore> <passwordkeystore> <dev-id> <user-id> <--");
             System.out.println("---------------------------------");
             return false;
         }
