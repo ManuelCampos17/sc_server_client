@@ -11,12 +11,19 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.Signature;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.util.Scanner;
 
 // --------------------------------- //
@@ -59,7 +66,9 @@ public class IoTDevice {
             kstore = KeyStore.getInstance("JCEKS");
             tstore = KeyStore.getInstance("JCEKS");
 
-            kstore.load(kfile, args[3].toCharArray());           //password para aceder à keystore
+            char[] kstorepass = args[3].toCharArray();
+
+            kstore.load(kfile, kstorepass);           //password para aceder à keystore
 
             if (addr.length == 1) {
                 serverAddress = addr[0];
@@ -77,22 +86,64 @@ public class IoTDevice {
             String password = sc.nextLine();
 
             // Enviar a password
-            out.writeObject(userId + ":" + password);
+            // out.writeObject(userId + ":" + password); (OLD)
+            out.writeObject(userId);
             out.flush();
 
-            String msgPass = (String) in.readObject();
+            // String msgPass = (String) in.readObject(); (OLD)
 
-            // Loop para verificar a password
-            while (msgPass.equals("WRONG-PWD")) {
-                System.out.println("Password Errada");
-                System.out.print("Insere a tua Password: ");
-                password = sc.nextLine();
-                out.writeObject(password);
-                out.flush();
-                msgPass = (String) in.readObject();
+            byte[] nonce = (byte[]) in.readObject();
+            String regStatus = (String) in.readObject();
+
+            // Loop para verificar a password (OLD)
+            // while (msgPass.equals("WRONG-PWD")) {
+            //     System.out.println("Password Errada");
+            //     System.out.print("Insere a tua Password: ");
+            //     password = sc.nextLine();
+            //     out.writeObject(password);
+            //     out.flush();
+            //     msgPass = (String) in.readObject();
+            // }
+
+            //System.out.println(msgPass);
+
+            // Tratar a resposta do servidor
+            if (regStatus.equals("notregistered")) {
+                System.out.println("Unknown user. Initiating registering process...");
+
+                // Realizar o registro do usuário
+                boolean regSucc = registerUser(nonce, out, in, kstore, kstorepass);
+
+                if (regSucc) {
+                    System.out.println("Registered successfuly.");
+                } else {
+                    System.out.println("Registering error.");
+                    return;
+                }
             }
+            else 
+            {
+                PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kstorepass);
 
-            System.out.println(msgPass);
+                //Assinar nonce
+                Signature sign = Signature.getInstance("MD5withRSA");
+                sign.initSign(privateKey);
+                sign.update(nonce);
+
+                out.writeObject(sign.sign());
+                out.flush();
+
+                String res = (String) in.readObject();
+
+                if (res.equals("checkedvalid")) {
+                    System.out.println("Auth successful.");
+                }
+                else 
+                {
+                    System.out.println("Auth error.");
+                    return;
+                }
+            }
 
             // Enviar o devId
             out.writeObject(devId);
@@ -283,6 +334,43 @@ public class IoTDevice {
 
         } catch (Exception e) {
             System.err.println("Disconnecting from Server...");
+        }
+    }
+
+    private static boolean registerUser(byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
+        try {
+            PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kpass);
+
+            //Assinar nonce
+            Signature sign = Signature.getInstance("MD5withRSA");
+            sign.initSign(privateKey);
+            sign.update(nonce);
+
+            out.writeObject(nonce);
+            out.flush();
+
+            out.writeObject(sign.sign());
+            out.flush();
+
+            // Certificado
+            Certificate cert = kstore.getCertificate("publicKey");
+
+            out.writeObject(cert);
+            out.flush();
+
+            String res = (String) in.readObject();
+
+            if (res.equals("checkedvalid")) {
+                return true;
+            }
+            else 
+            {
+                return false;
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
     }
 
