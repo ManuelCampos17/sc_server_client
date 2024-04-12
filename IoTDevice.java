@@ -57,7 +57,7 @@ public class IoTDevice {
             }
 
             //Setup do TLS/SSL
-            String trustStore = "cliTruststore.jks";
+            String trustStore = "cliTstore.jks";
             String trustStorePassword = "grupoquinze";
 
             clientSocket = Utils.initializeClient(trustStore, trustStorePassword, serverAddress, port);

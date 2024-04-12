@@ -56,7 +56,7 @@ public class IoTServer {
         }
 
         // TLS/SSL
-        String keyStore = "serverstore.jks"; // "serverstore.jks
+        String keyStore = "sv.jks"; // "serverstore.jks
         String password = "grupoquinze";
 
 
@@ -69,7 +69,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:8136");
+                myWriterClient.write("IoTDevice.class:8132");
                 myWriterClient.close();
             } else 
             {
