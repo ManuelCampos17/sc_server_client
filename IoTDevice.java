@@ -66,8 +66,8 @@ public class IoTDevice {
             FileInputStream tfile = new FileInputStream(args[1]);  //truststore
             FileInputStream kfile = new FileInputStream(args[2]);  //keystore
 
-            kstore = KeyStore.getInstance("PKCS12");
-            tstore = KeyStore.getInstance("PKCS12");
+            kstore = KeyStore.getInstance("JCEKS");
+            tstore = KeyStore.getInstance("JCEKS");
 
             char[] kstorepass = args[3].toCharArray();
 

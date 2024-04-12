@@ -80,7 +80,7 @@ public class IoTServer {
 
         try {
             FileInputStream kStoreFile = new FileInputStream(args[2]);
-            KeyStore kstore = KeyStore.getInstance("PKCS12");
+            KeyStore kstore = KeyStore.getInstance("JCEKS");
             kstore.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
         } catch (Exception e) {
             e.printStackTrace();
