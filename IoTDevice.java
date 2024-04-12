@@ -92,31 +92,11 @@ public class IoTDevice {
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
 
-            // Pedir a password (OLD)
-            // System.out.print("Insere a tua Password: ");
-            // String password = sc.nextLine();
-
-            // Enviar a password
-            // out.writeObject(userId + ":" + password); (OLD)
             out.writeObject(userId);
             out.flush();
 
-            // String msgPass = (String) in.readObject(); (OLD)
-
             byte[] nonce = (byte[]) in.readObject();
             String regStatus = (String) in.readObject();
-
-            // Loop para verificar a password (OLD)
-            // while (msgPass.equals("WRONG-PWD")) {
-            //     System.out.println("Password Errada");
-            //     System.out.print("Insere a tua Password: ");
-            //     password = sc.nextLine();
-            //     out.writeObject(password);
-            //     out.flush();
-            //     msgPass = (String) in.readObject();
-            // }
-
-            //System.out.println(msgPass);
 
             // Tratar a resposta do servidor
             if (regStatus.equals("notregistered")) {
@@ -352,13 +332,13 @@ public class IoTDevice {
         try {
             PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kpass);
 
+            out.writeObject(nonce);
+            out.flush();
+
             //Assinar nonce
             Signature sign = Signature.getInstance("MD5withRSA");
             sign.initSign(privateKey);
             sign.update(nonce);
-
-            out.writeObject(nonce);
-            out.flush();
 
             out.writeObject(sign.sign());
             out.flush();

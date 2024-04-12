@@ -10,6 +10,7 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -99,7 +100,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:8136");
+                myWriterClient.write("IoTDevice.class:9795");
                 myWriterClient.close();
             } else 
             {
@@ -284,10 +285,6 @@ public class IoTServer {
                 System.out.println("Client connected");
                 String userId = (String) in.readObject();
 
-                //OLD
-                // String[] temp = login.split(":");
-                // currUser = temp[0];
-
                 byte[] nonce;
                 boolean isRegistered = verifyUser(userId);
 
@@ -342,7 +339,7 @@ public class IoTServer {
                         s.update(recNonce);
                         boolean verifySig = s.verify(recSignature);
 
-                        if (recNonce == nonce && verifySig) {
+                        if (Arrays.equals(recNonce, nonce) && verifySig) {
                             out.writeObject("checkedvalid");
                             out.flush();
 
@@ -365,12 +362,7 @@ public class IoTServer {
                     e.printStackTrace();
                 }
 
-                //Handle Auth (OLD)
-                //handleAuth(in, out, login, temp[0], temp[1]);
-
-                //PLACEHOLDER PARA TIRAR OS ERROS POR CAUSA DO LOGIN COM PASSWORD - DEPOIS RESOLVER
-                String placeholder = "aaaaa";
-                String[] temp = placeholder.split(" ");
+                String[] temp = userId.split("@");
 
                 //Handle Auth Dev-id
                 int dev_id = (int) in.readObject();

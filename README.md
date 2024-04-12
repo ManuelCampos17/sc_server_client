@@ -42,3 +42,9 @@ Keystore: svStore,   svRSA
 TrustStore: cliTrustStore,  svCert
 
 Passwords: grupoquinze
+
+Truststore -> cada certificado tem o alias correspondente ao nosso mail até ao @ para ser mais facil o seu mapeamento.
+
+Sempre que for necessário usar um mail novo, temos de criar previamente o mesmo na trusstore como alias do certificado.
+
+Keystore: Alias de cada key é o userid do mail até ao @
