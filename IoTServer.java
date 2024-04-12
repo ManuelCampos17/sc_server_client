@@ -1,7 +1,11 @@
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -13,6 +17,8 @@ import java.security.cert.CertificateFactory;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -283,90 +289,12 @@ public class IoTServer {
                 ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream());
             ) {
                 System.out.println("Client connected");
-                String userId = (String) in.readObject();
 
-                byte[] nonce;
-                boolean isRegistered = verifyUser(userId);
+                authOperations(in, out);
 
-                try {
-                    // Enviar nonce para o cliente
-                    nonce = generateNonce();
-                    out.writeObject(nonce);
-                    out.flush();
-                    
-                    if (isRegistered) {
-                        out.writeObject("registered");
-
-                        byte[] signedNonce = (byte[]) in.readObject();
-
-                        FileInputStream fis = new FileInputStream(userId.split("@")[0] + ".cer");
-                        CertificateFactory cf = CertificateFactory.getInstance("X509");
-                        Certificate cert = cf.generateCertificate(fis);
-                        PublicKey userPubKey = cert.getPublicKey();
-                        fis.close();
-
-                        Signature s = Signature.getInstance("MD5withRSA");
-                        s.initVerify(userPubKey);
-                        s.update(nonce);
-                        boolean verifySig = s.verify(signedNonce);
-
-                        if (verifySig) {
-                            out.writeObject("checkedvalid");
-                            out.flush();
-                        }
-                        else 
-                        {
-                            out.writeObject("checkedinvalid");
-                            out.flush();
-                        }
-                    } else {
-                        out.writeObject("notregistered");
-
-                        byte[] recNonce = (byte[]) in.readObject();
-                        byte[] recSignature = (byte[]) in.readObject();
-                        Certificate recCertificate = (Certificate) in.readObject();
-                        PublicKey recPubKey = recCertificate.getPublicKey();
-
-                        //Criar certificate file do user
-                        byte[] certBytes = recCertificate.getEncoded();
-                        String[] splitEmail = userId.split("@");
-                        FileOutputStream fos = new FileOutputStream(splitEmail[0] + ".cer");
-                        fos.write(certBytes);
-                        fos.close();
-
-                        Signature s = Signature.getInstance("MD5withRSA");
-                        s.initVerify(recPubKey);
-                        s.update(recNonce);
-                        boolean verifySig = s.verify(recSignature);
-
-                        if (Arrays.equals(recNonce, nonce) && verifySig) {
-                            out.writeObject("checkedvalid");
-                            out.flush();
-
-                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
-                            myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
-                            myWriterUsers.close();
-                            userCredentials.put(userId, splitEmail[0] + ".cer");
-
-                            LinkedList<Integer> newUserDevIds = new LinkedList<>();
-
-                            connected.put(userId, newUserDevIds);
-                        }
-                        else 
-                        {
-                            out.writeObject("checkedinvalid");
-                            out.flush();
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
-                String[] temp = userId.split("@");
-
-                //Handle Auth Dev-id
+                //Handle Auth Dev-id (Later)
                 int dev_id = (int) in.readObject();
-                int currDevId = handleDevId(in, out, temp[0], dev_id);
+                int currDevId = handleDevId(in, out, currUser, dev_id);
 
                 //Handle file size
                 String programName = (String) in.readObject();
@@ -377,11 +305,10 @@ public class IoTServer {
                     out.close();
                     in.close();
                     clientSocket.close();
-                    System.out.println("User " + temp[0] + "_" + currDevId + " disconnected.");
+                    System.out.println("User " + currUser + "_" + currDevId + " disconnected.");
                     return;
                 }
                 
-
                 // Fazer varias operacoes
                 while (true){
                     // Grande switch case
@@ -392,15 +319,15 @@ public class IoTServer {
                         case "CREATE":
                             if (domains.isEmpty()) {
                                 serverLock.lock();
-                                Domain newDomain = new Domain(reqSplit[1], temp[0]);
-                                newDomain.addUser(temp[0]);
+                                Domain newDomain = new Domain(reqSplit[1], currUser);
+                                newDomain.addUser(currUser);
                                 domains.add(newDomain);
 
                                 
                                 try{
                                     //Escrever no domains file
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
-                                    myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                                    myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                     myWriterDomainsCR.close();
 
@@ -429,13 +356,13 @@ public class IoTServer {
                             
                             serverLock.lock();
                             try{
-                                Domain newDomain = new Domain(reqSplit[1], temp[0]);
-                                newDomain.addUser(temp[0]);
+                                Domain newDomain = new Domain(reqSplit[1], currUser);
+                                newDomain.addUser(currUser);
                                 domains.add(newDomain);
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
                                 //O primeiro user é o creator
-                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + temp[0] + System.getProperty("line.separator"));
+                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
                                 myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
 
@@ -478,7 +405,7 @@ public class IoTServer {
                                     break;
                                 }
     
-                                if (!selectedDomADD.getCreator().equals(temp[0])) {
+                                if (!selectedDomADD.getCreator().equals(currUser)) {
                                     out.writeObject("NOPERM # sem permissoes");
                                     out.flush();
                                     break;
@@ -524,14 +451,14 @@ public class IoTServer {
                                     break;
                                 }
 
-                                if (!selectedDomRD.getUsers().contains(temp[0])) {
+                                if (!selectedDomRD.getUsers().contains(currUser)) {
                                     out.writeObject("NOPERM # sem permissoes");
                                     out.flush();
                                     break;
                                 }
 
                                 domains.remove(selectedDomRD);
-                                selectedDomRD.addDevice(temp[0] + "_" + currDevId);;
+                                selectedDomRD.addDevice(currUser + "_" + currDevId);;
                                 domains.add(selectedDomRD);
                                 
                                 updateDomainsFile();
@@ -558,7 +485,7 @@ public class IoTServer {
 
                             serverLock.lock();
                             try{
-                                temps.put(temp[0] + "_" + currDevId, Float.parseFloat(reqSplit[1]));
+                                temps.put(currUser + "_" + currDevId, Float.parseFloat(reqSplit[1]));
 
                                 //Write no temps file
                                 tempsFile.delete();
@@ -579,7 +506,7 @@ public class IoTServer {
 
                             break;
                         case "EI":
-                            ei(reqSplit[1], temp[0], currDevId, in, out);
+                            ei(reqSplit[1], currUser, currDevId, in, out);
                             break;
                         case "RT":
                             serverLock.lock();
@@ -594,7 +521,7 @@ public class IoTServer {
                                     
                                     if (dom.getName().equals(reqSplit[1])) {
                                         //Check read perms
-                                        if (!dom.getUsers().contains(temp[0])) {
+                                        if (!dom.getUsers().contains(currUser)) {
                                             out.writeObject("NOPERM # sem permissoes de leitura");
                                             out.flush();
                                             rtFileWriter.close();
@@ -682,7 +609,7 @@ public class IoTServer {
                                 
                                 boolean hasPerms = false;
 
-                                if (reqSplit[1].equals(temp[0] + ":" + currDevId)) {
+                                if (reqSplit[1].equals(currUser + ":" + currDevId)) {
                                     hasPerms = true;
                                 }
                                 else 
@@ -690,7 +617,7 @@ public class IoTServer {
                                     for (Domain dom : domains) {
                                         if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1])) {
                                             //Check read perms
-                                            if (dom.getUsers().contains(temp[0])) {
+                                            if (dom.getUsers().contains(currUser)) {
                                                 hasPerms = true;
                                             }
                                         }
@@ -738,6 +665,183 @@ public class IoTServer {
                 }
                 
             } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void authOperations(ObjectInputStream in, ObjectOutputStream out) {
+            try {
+                //4.2.1
+                String userId = (String) in.readObject();
+
+                byte[] nonce;
+                boolean isRegistered = verifyUser(userId);
+
+                try {
+                    // Enviar nonce para o cliente
+                    nonce = generateNonce();
+                    out.writeObject(nonce);
+                    out.flush();
+                    
+                    if (isRegistered) {
+                        out.writeObject("registered");
+
+                        byte[] signedNonce = (byte[]) in.readObject();
+
+                        FileInputStream fis = new FileInputStream(userId.split("@")[0] + ".cer");
+                        CertificateFactory cf = CertificateFactory.getInstance("X509");
+                        Certificate cert = cf.generateCertificate(fis);
+                        PublicKey userPubKey = cert.getPublicKey();
+                        fis.close();
+
+                        Signature s = Signature.getInstance("MD5withRSA");
+                        s.initVerify(userPubKey);
+                        s.update(nonce);
+                        boolean verifySig = s.verify(signedNonce);
+
+                        if (verifySig) {
+                            out.writeObject("checkedvalid");
+                            out.flush();
+                        }
+                        else 
+                        {
+                            out.writeObject("checkedinvalid");
+                            out.flush();
+                        }
+                    } else {
+                        out.writeObject("notregistered");
+
+                        byte[] recNonce = (byte[]) in.readObject();
+                        byte[] recSignature = (byte[]) in.readObject();
+                        Certificate recCertificate = (Certificate) in.readObject();
+                        PublicKey recPubKey = recCertificate.getPublicKey();
+
+                        //Criar certificate file do user
+                        byte[] certBytes = recCertificate.getEncoded();
+                        String[] splitEmail = userId.split("@");
+                        FileOutputStream fos = new FileOutputStream(splitEmail[0] + ".cer");
+                        fos.write(certBytes);
+                        fos.close();
+
+                        Signature s = Signature.getInstance("MD5withRSA");
+                        s.initVerify(recPubKey);
+                        s.update(recNonce);
+                        boolean verifySig = s.verify(recSignature);
+
+                        if (Arrays.equals(recNonce, nonce) && verifySig) {
+                            out.writeObject("checkedvalid");
+                            out.flush();
+
+                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
+                            myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
+                            myWriterUsers.close();
+                            userCredentials.put(userId, splitEmail[0] + ".cer");
+
+                            LinkedList<Integer> newUserDevIds = new LinkedList<>();
+
+                            connected.put(userId.split("@")[0], newUserDevIds);
+                        }
+                        else 
+                        {
+                            out.writeObject("checkedinvalid");
+                            out.flush();
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                String[] temp = userId.split("@");
+                currUser = temp[0];
+
+                //4.2.2
+                String C2FA = Utils.generateC2FA();
+
+                if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
+                    out.writeObject("yes");
+                    out.flush();
+
+                    sendEmail(userId, C2FA);
+                }
+                else 
+                {
+                    boolean correctEmail = false;
+
+                    while (!correctEmail) {
+                        out.writeObject("no");
+                        out.flush();
+
+                        userId = (String) in.readObject();
+
+                        if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
+                            correctEmail = true;
+                        }
+                    }
+
+                    out.writeObject("yes");
+                    out.flush();
+
+                    sendEmail(userId, C2FA);
+                }
+
+                String recCode = (String) in.readObject();
+
+                if (!recCode.equals(C2FA)) {
+                    out.writeObject("C2FA code incorrect.");
+                    out.flush();
+
+                    String userTryAgain = (String) in.readObject();
+
+                    if (userTryAgain.equals("tryagain")) {
+                        authOperations(in, out);
+                    }
+                }
+                else 
+                {
+                    out.writeObject("C2FA code correct. User auth success.");
+                    out.flush();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void sendEmail(String userId, String C2FA) {
+            String apiKey = "zWG5VYlpX9NwOWLvUqn1"; // Chave da API de dois fatores
+
+            // Monta a URL com os parâmetros fornecidos
+            String url = "https://lmpinto.eu.pythonanywhere.com/2FA?e=" + userId + "&c=" + C2FA + "&a=" + apiKey;
+
+            try {
+                // Cria um objeto URL a partir da string da URL
+                URL requestUrl = new URI(url).toURL();
+                
+                // Abre a conexão HTTP
+                HttpURLConnection connection = (HttpURLConnection) requestUrl.openConnection();
+                
+                // Define o método HTTP como GET
+                connection.setRequestMethod("GET");
+                
+                // Lê a resposta da API
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder response = new StringBuilder();
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+
+                reader.close();
+                
+                // Imprime a resposta da API
+                System.out.println("Response from API: " + response.toString());
+
+                // Fecha a conexão
+                connection.disconnect();
+                
+                // Espera 5 segundos entre as chamadas (conforme requisito da API)
+                TimeUnit.SECONDS.sleep(5);
+            } catch (IOException | InterruptedException | URISyntaxException e) {
                 e.printStackTrace();
             }
         }

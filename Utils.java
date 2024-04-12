@@ -1,7 +1,14 @@
 // Classe para colocar funções úteis que podem ser usadas em várias partes do código
 
 import java.io.FileInputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.cert.Certificate;
+import java.util.Random;
+import java.util.Scanner;
 
 import javax.net.SocketFactory;
 import javax.net.ssl.KeyManagerFactory;
@@ -98,5 +105,152 @@ public class Utils {
         }
     
         return socket;
+    }
+
+    public static String generateC2FA() {
+        Random random = new Random();
+        int randomNumber = random.nextInt(100000);
+        String fiveDigits = String.format("%05d", randomNumber);
+
+        return fiveDigits;
+    }
+
+    public static void assymCrypt(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+        try {
+            out.writeObject(userId);
+            out.flush();
+
+            byte[] nonce = (byte[]) in.readObject();
+            String regStatus = (String) in.readObject();
+
+            // Tratar a resposta do servidor
+            if (regStatus.equals("notregistered")) {
+                System.out.println("Unknown user. Initiating registering process...");
+
+                // Realizar o registro do usuário
+                boolean regSucc = registerUser(userId, tstore, nonce, out, in, kstore, kstorepass);
+
+                if (regSucc) {
+                    System.out.println("Registered successfuly.");
+                } else {
+                    System.out.println("Registering error.");
+                    return;
+                }
+            }
+            else 
+            {
+                PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
+
+                //Assinar nonce
+                Signature sign = Signature.getInstance("MD5withRSA");
+                sign.initSign(privateKey);
+                sign.update(nonce);
+
+                out.writeObject(sign.sign());
+                out.flush();
+
+                String res = (String) in.readObject();
+
+                if (res.equals("checkedvalid")) {
+                    System.out.println("Auth successful.");
+                }
+                else 
+                {
+                    System.out.println("Auth error.");
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static boolean registerUser(String userId, KeyStore tstore, byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
+        try {
+            PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kpass);
+
+            out.writeObject(nonce);
+            out.flush();
+
+            //Assinar nonce
+            Signature sign = Signature.getInstance("MD5withRSA");
+            sign.initSign(privateKey);
+            sign.update(nonce);
+
+            out.writeObject(sign.sign());
+            out.flush();
+
+            Certificate cert = kstore.getCertificate(userId.split("@")[0]);
+
+            out.writeObject(cert);
+            out.flush();
+
+            String res = (String) in.readObject();
+
+            if (res.equals("checkedvalid")) {
+                return true;
+            }
+            else 
+            {
+                return false;
+            }
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static void emailConf(ObjectOutputStream out, ObjectInputStream in, String userId, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+        try {
+            String emailCorrect = (String) in.readObject();
+            Scanner scEmail = new Scanner(System.in);
+
+            while (emailCorrect.equals("no")) {
+                System.out.println("Email invalido, insira um email valido: ");
+                userId = scEmail.nextLine();
+
+                out.writeObject(userId);
+                out.flush();
+
+                emailCorrect = (String) in.readObject();
+            }
+
+            scEmail.close();
+
+            Scanner scCode = new Scanner(System.in);
+            System.out.println("Introduza o código enviado pelo servidor: ");
+            String code = scCode.nextLine();
+            scCode.close();
+
+            out.writeObject(code);
+            out.flush();
+
+            String codeRes = (String) in.readObject();
+            System.out.println(codeRes);
+
+            if (codeRes.equals("C2FA code incorrect.")) {
+                Scanner scTryAgainAuth = new Scanner(System.in);
+                System.out.println("Deseja tentar autenticar-se de novo? Yes/No:");
+                String respTryAgain = scTryAgainAuth.nextLine();
+                scTryAgainAuth.close();
+
+                if (respTryAgain.equals("No")) {
+                    out.writeObject("notryagain");
+                    out.flush();
+
+                    return;
+                }
+                else 
+                {
+                    out.writeObject("tryagain");
+                    out.flush();
+                    
+                    IoTDevice.twoFactorAuth(out, userId, in, tstore, kstore, kstorepass);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

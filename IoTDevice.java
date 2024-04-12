@@ -92,51 +92,10 @@ public class IoTDevice {
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
 
-            out.writeObject(userId);
-            out.flush();
+            //4.2
+            twoFactorAuth(out, userId, in, tstore, kstore, kstorepass);
 
-            byte[] nonce = (byte[]) in.readObject();
-            String regStatus = (String) in.readObject();
-
-            // Tratar a resposta do servidor
-            if (regStatus.equals("notregistered")) {
-                System.out.println("Unknown user. Initiating registering process...");
-
-                // Realizar o registro do usuário
-                boolean regSucc = registerUser(userId, tstore, nonce, out, in, kstore, kstorepass);
-
-                if (regSucc) {
-                    System.out.println("Registered successfuly.");
-                } else {
-                    System.out.println("Registering error.");
-                    return;
-                }
-            }
-            else 
-            {
-                PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
-
-                //Assinar nonce
-                Signature sign = Signature.getInstance("MD5withRSA");
-                sign.initSign(privateKey);
-                sign.update(nonce);
-
-                out.writeObject(sign.sign());
-                out.flush();
-
-                String res = (String) in.readObject();
-
-                if (res.equals("checkedvalid")) {
-                    System.out.println("Auth successful.");
-                }
-                else 
-                {
-                    System.out.println("Auth error.");
-                    return;
-                }
-            }
-
-            // Enviar o devId
+            // Enviar o devId (NAO VAI SER AQUI, VAI SER MUDADO DE SITIO DEPOIS)
             out.writeObject(devId);
             out.flush();
 
@@ -328,40 +287,9 @@ public class IoTDevice {
         }
     }
 
-    private static boolean registerUser(String userId, KeyStore tstore, byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
-        try {
-            PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kpass);
-
-            out.writeObject(nonce);
-            out.flush();
-
-            //Assinar nonce
-            Signature sign = Signature.getInstance("MD5withRSA");
-            sign.initSign(privateKey);
-            sign.update(nonce);
-
-            out.writeObject(sign.sign());
-            out.flush();
-
-            Certificate cert = kstore.getCertificate(userId.split("@")[0]);
-
-            out.writeObject(cert);
-            out.flush();
-
-            String res = (String) in.readObject();
-
-            if (res.equals("checkedvalid")) {
-                return true;
-            }
-            else 
-            {
-                return false;
-            }
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
+    public static void twoFactorAuth(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+        Utils.assymCrypt(out, userId, in, tstore, kstore, kstorepass);
+        Utils.emailConf(out, in, userId, tstore, kstore, kstorepass);
     }
 
     public static boolean argsCheck(String[] args) {
