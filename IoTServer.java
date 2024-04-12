@@ -17,7 +17,6 @@ import java.security.cert.CertificateFactory;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -106,7 +105,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:9795");
+                myWriterClient.write("IoTDevice.class:8964");
                 myWriterClient.close();
             } else 
             {
@@ -761,7 +760,7 @@ public class IoTServer {
                     out.writeObject("yes");
                     out.flush();
 
-                    sendEmail(userId, C2FA);
+                    sendEmail(userId, C2FA, apiKey);
                 }
                 else 
                 {
@@ -781,7 +780,7 @@ public class IoTServer {
                     out.writeObject("yes");
                     out.flush();
 
-                    sendEmail(userId, C2FA);
+                    sendEmail(userId, C2FA, apiKey);
                 }
 
                 String recCode = (String) in.readObject();
@@ -806,9 +805,7 @@ public class IoTServer {
             }
         }
 
-        private void sendEmail(String userId, String C2FA) {
-            String apiKey = "zWG5VYlpX9NwOWLvUqn1"; // Chave da API de dois fatores
-
+        private void sendEmail(String userId, String C2FA, String apiKey) {
             // Monta a URL com os parâmetros fornecidos
             String url = "https://lmpinto.eu.pythonanywhere.com/2FA?e=" + userId + "&c=" + C2FA + "&a=" + apiKey;
 

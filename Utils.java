@@ -115,7 +115,7 @@ public class Utils {
         return fiveDigits;
     }
 
-    public static void assymCrypt(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+    public static boolean assymCrypt(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
         try {
             out.writeObject(userId);
             out.flush();
@@ -134,7 +134,7 @@ public class Utils {
                     System.out.println("Registered successfuly.");
                 } else {
                     System.out.println("Registering error.");
-                    return;
+                    return false;
                 }
             }
             else 
@@ -157,11 +157,14 @@ public class Utils {
                 else 
                 {
                     System.out.println("Auth error.");
-                    return;
+                    return false;
                 }
             }
+
+            return true;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
     }
 
@@ -201,27 +204,21 @@ public class Utils {
         }
     }
 
-    public static void emailConf(ObjectOutputStream out, ObjectInputStream in, String userId, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+    public static boolean emailConf(Scanner sc, ObjectOutputStream out, ObjectInputStream in, String userId, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
         try {
             String emailCorrect = (String) in.readObject();
-            Scanner scEmail = new Scanner(System.in);
 
             while (emailCorrect.equals("no")) {
                 System.out.println("Email invalido, insira um email valido: ");
-                userId = scEmail.nextLine();
+                userId = sc.nextLine();
 
                 out.writeObject(userId);
                 out.flush();
 
                 emailCorrect = (String) in.readObject();
             }
-
-            scEmail.close();
-
-            Scanner scCode = new Scanner(System.in);
-            System.out.println("Introduza o código enviado pelo servidor: ");
-            String code = scCode.nextLine();
-            scCode.close();
+            System.out.println("Introduza o codigo enviado pelo servidor: ");
+            String code = sc.nextLine();
 
             out.writeObject(code);
             out.flush();
@@ -230,27 +227,29 @@ public class Utils {
             System.out.println(codeRes);
 
             if (codeRes.equals("C2FA code incorrect.")) {
-                Scanner scTryAgainAuth = new Scanner(System.in);
                 System.out.println("Deseja tentar autenticar-se de novo? Yes/No:");
-                String respTryAgain = scTryAgainAuth.nextLine();
-                scTryAgainAuth.close();
+                String respTryAgain = sc.nextLine();
 
                 if (respTryAgain.equals("No")) {
                     out.writeObject("notryagain");
                     out.flush();
 
-                    return;
+                    sc.close();
+                    return false;
                 }
                 else 
                 {
                     out.writeObject("tryagain");
                     out.flush();
-                    
-                    IoTDevice.twoFactorAuth(out, userId, in, tstore, kstore, kstorepass);
+
+                    IoTDevice.twoFactorAuth(sc, out, userId, in, tstore, kstore, kstorepass);
                 }
             }
+
+            return true;
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
     }
 }

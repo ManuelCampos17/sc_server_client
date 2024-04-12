@@ -53,6 +53,7 @@ public class IoTDevice {
 
             // Verificar o numero de argumentos
             if (!argsCheck(args)) {
+                sc.close();
                 return;
             }
 
@@ -93,7 +94,11 @@ public class IoTDevice {
             in = new ObjectInputStream(clientSocket.getInputStream());
 
             //4.2
-            twoFactorAuth(out, userId, in, tstore, kstore, kstorepass);
+            boolean twoFactorSucc = twoFactorAuth(sc, out, userId, in, tstore, kstore, kstorepass);
+
+            if (!twoFactorSucc) {
+                return;
+            }
 
             // Enviar o devId (NAO VAI SER AQUI, VAI SER MUDADO DE SITIO DEPOIS)
             out.writeObject(devId);
@@ -155,6 +160,7 @@ public class IoTDevice {
                     "RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
 
             System.out.println();
+
             while (true) {
                 System.out.println("--------------------------------------------------");
                 System.out.println("Enter command:");
@@ -287,9 +293,11 @@ public class IoTDevice {
         }
     }
 
-    public static void twoFactorAuth(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
-        Utils.assymCrypt(out, userId, in, tstore, kstore, kstorepass);
-        Utils.emailConf(out, in, userId, tstore, kstore, kstorepass);
+    public static boolean twoFactorAuth(Scanner sc, ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
+        boolean firstStep = Utils.assymCrypt(out, userId, in, tstore, kstore, kstorepass);
+        boolean secondStep = Utils.emailConf(sc, out, in, userId, tstore, kstore, kstorepass);
+
+        return firstStep && secondStep;
     }
 
     public static boolean argsCheck(String[] args) {
