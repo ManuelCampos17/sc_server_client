@@ -92,9 +92,9 @@ public class IoTDevice {
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
 
-            // Pedir a password
-            System.out.print("Insere a tua Password: ");
-            String password = sc.nextLine();
+            // Pedir a password (OLD)
+            // System.out.print("Insere a tua Password: ");
+            // String password = sc.nextLine();
 
             // Enviar a password
             // out.writeObject(userId + ":" + password); (OLD)
@@ -123,7 +123,7 @@ public class IoTDevice {
                 System.out.println("Unknown user. Initiating registering process...");
 
                 // Realizar o registro do usuário
-                boolean regSucc = registerUser(nonce, out, in, kstore, kstorepass);
+                boolean regSucc = registerUser(userId, tstore, nonce, out, in, kstore, kstorepass);
 
                 if (regSucc) {
                     System.out.println("Registered successfuly.");
@@ -134,7 +134,7 @@ public class IoTDevice {
             }
             else 
             {
-                PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kstorepass);
+                PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
 
                 //Assinar nonce
                 Signature sign = Signature.getInstance("MD5withRSA");
@@ -348,9 +348,9 @@ public class IoTDevice {
         }
     }
 
-    private static boolean registerUser(byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
+    private static boolean registerUser(String userId, KeyStore tstore, byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
         try {
-            PrivateKey privateKey = (PrivateKey) kstore.getKey("private", kpass);
+            PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kpass);
 
             //Assinar nonce
             Signature sign = Signature.getInstance("MD5withRSA");
@@ -363,8 +363,7 @@ public class IoTDevice {
             out.writeObject(sign.sign());
             out.flush();
 
-            // Certificado
-            Certificate cert = kstore.getCertificate("publicKey");
+            Certificate cert = kstore.getCertificate(userId.split("@")[0]);
 
             out.writeObject(cert);
             out.flush();

@@ -134,7 +134,7 @@ public class IoTServer {
             System.out.println("Server initialized on port: " + port);
 
             //Criar user file caso nao exista
-            userFile = new File("userCredentials.txt");
+            userFile = new File("users.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
             } else {
@@ -151,7 +151,7 @@ public class IoTServer {
 
             //Ir buscar as credentials que ja estao no file
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("userCredentials.txt"));
+                BufferedReader rb = new BufferedReader(new FileReader("users.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
@@ -302,10 +302,11 @@ public class IoTServer {
 
                         byte[] signedNonce = (byte[]) in.readObject();
 
-                        FileInputStream fis = new FileInputStream("certificadoDoUser.cer");
+                        FileInputStream fis = new FileInputStream(userId.split("@")[0] + ".cer");
                         CertificateFactory cf = CertificateFactory.getInstance("X509");
                         Certificate cert = cf.generateCertificate(fis);
                         PublicKey userPubKey = cert.getPublicKey();
+                        fis.close();
 
                         Signature s = Signature.getInstance("MD5withRSA");
                         s.initVerify(userPubKey);
@@ -329,6 +330,13 @@ public class IoTServer {
                         Certificate recCertificate = (Certificate) in.readObject();
                         PublicKey recPubKey = recCertificate.getPublicKey();
 
+                        //Criar certificate file do user
+                        byte[] certBytes = recCertificate.getEncoded();
+                        String[] splitEmail = userId.split("@");
+                        FileOutputStream fos = new FileOutputStream(splitEmail[0] + ".cer");
+                        fos.write(certBytes);
+                        fos.close();
+
                         Signature s = Signature.getInstance("MD5withRSA");
                         s.initVerify(recPubKey);
                         s.update(recNonce);
@@ -338,10 +346,10 @@ public class IoTServer {
                             out.writeObject("checkedvalid");
                             out.flush();
 
-                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
-                            myWriterUsers.write(userId + ":" + "nomeFicheiroComCertDoUser" + System.getProperty("line.separator"));
+                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
+                            myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
                             myWriterUsers.close();
-                            userCredentials.put(userId, "nomeFicheiroComCertDoUser");
+                            userCredentials.put(userId, splitEmail[0] + ".cer");
 
                             LinkedList<Integer> newUserDevIds = new LinkedList<>();
 
@@ -751,11 +759,13 @@ public class IoTServer {
 
         private static boolean verifyUser(String userId) {
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("userCredentials.txt"));
+                BufferedReader rb = new BufferedReader(new FileReader("users.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
-                    if (line.equals(userId)) {
+                    String[] splitLine = line.split(":");
+
+                    if (splitLine[0].equals(userId)) {
                         rb.close();
                         return true;
                     }
@@ -778,7 +788,7 @@ public class IoTServer {
                 serverLock.lock();
                 try{
                     //Escrever no credentials file
-                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("userCredentials.txt", true));
+                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
                     myWriterUsers.write(login + System.getProperty("line.separator"));
                     myWriterUsers.close();
                     userCredentials.put(user, password);
