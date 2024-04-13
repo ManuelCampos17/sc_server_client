@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.KeyPair;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -57,9 +58,6 @@ public class IoTServer {
     //Usernames e passwords
     private static File userFile;
 
-    //App name e size
-    private static File clientProgramData;
-
     //Domain file
     private static File domainsInfo;
 
@@ -94,29 +92,6 @@ public class IoTServer {
 
         apiKey = args[4];
 
-
-
-        //Criar size e nome do client executable caso nao exista
-        serverLock.lock();
-        clientProgramData = new File("clientProgram.txt");
-        try {
-            if (clientProgramData.createNewFile()) {
-                System.out.println("Client file data created");
-
-                //Escrever nome e size
-                BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:8838");
-                myWriterClient.close();
-            } else 
-            {
-                System.out.println("Client file data already exists.");
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            serverLock.unlock();
-        }
-
         serverLock.lock();
         //Criar file com info dos domains caso nao exista (vazio por agora)
         domainsInfo = new File("domainsInfo.txt");
@@ -134,7 +109,7 @@ public class IoTServer {
         }
 
         serverLock.lock();
-        try (SSLServerSocket srvSocket = Utils.initializeServer(keyStore, pass_keystore, port)) {
+        try (SSLServerSocket srvSocket = UtilsServer.initializeServer(keyStore, pass_keystore, port)) {
 
 
             System.out.println("Server initialized on port: " + port);
@@ -305,10 +280,15 @@ public class IoTServer {
                     return;
                 }
 
-                //Handle file size
-                String programName = (String) in.readObject();
-                long programSize = (long) in.readObject();
-                boolean fileCheck = handleFileSize(in, out, programName, programSize);
+                // adicionar o nonce como verificação para o cliente
+                byte[] nonce = generateNonce();
+
+                out.writeObject(nonce);
+                out.flush();
+
+                //Handle file
+                byte[] exeTest = (byte[]) in.readObject();
+                boolean fileCheck = handleFile(in, out,nonce, exeTest);
 
                 if (!fileCheck) {
                     out.close();
@@ -673,7 +653,7 @@ public class IoTServer {
                     serverLock.unlock();
                 }
                 
-            } catch (IOException | ClassNotFoundException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -764,7 +744,7 @@ public class IoTServer {
                 currUser = temp[0];
 
                 //4.2.2
-                String C2FA = Utils.generateC2FA();
+                String C2FA = UtilsServer.generateC2FA();
 
                 if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
                     out.writeObject("yes");
@@ -1002,29 +982,43 @@ public class IoTServer {
             return dev_id;
         }
 
-        private static synchronized boolean handleFileSize(ObjectInputStream in, ObjectOutputStream out, String progName, long progSize) {
+        private static synchronized boolean handleFile(ObjectInputStream in, ObjectOutputStream out, byte [] nonce, byte[] exeTest) {
             boolean retval = false;
 
             serverLock.lock();
             try {
-                BufferedReader progInfoReader = new BufferedReader(new FileReader("clientProgram.txt"));
-                String line = progInfoReader.readLine();
-                String[] serverProgDataSplit = line.split(":");
+                String flName = "IoTDeviceCopy.class";
+                File f = new File(flName);
+                int flSize = (int) f.length();
 
-                if ((serverProgDataSplit[0].equals(progName)) && (Long.parseLong(serverProgDataSplit[1]) == progSize)) {
+                FileInputStream fis = new FileInputStream(f);
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                byte[] bytesBuffer = new byte[flSize];
+                long bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
+
+                // Concatenar o nonce o conteudo do ficheiro
+                byte[] concatNonceFl = new byte[nonce.length + bytesBuffer.length];
+                System.arraycopy(nonce, 0, concatNonceFl, 0, nonce.length);
+                System.arraycopy(bytesBuffer, 0, concatNonceFl, nonce.length, bytesBuffer.length);
+
+                bis.close();
+
+                // Calcular o hash do ficheiro
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                byte[] hash = md.digest(concatNonceFl);
+
+                if ( Arrays.equals(hash, exeTest) ) {
                     out.writeObject("OK-TESTED");
                     out.flush();
-                    progInfoReader.close();
                     retval = true;
                 }
                 else 
                 {
                     out.writeObject("NOK-TESTED");
                     out.flush();
-                    progInfoReader.close();
                     retval = false;
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             } finally {
                 serverLock.unlock();

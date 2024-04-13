@@ -85,7 +85,7 @@ public class IoTDevice {
             String trustStore = args[1];
             String trustStorePassword = args[3]; // Mudar, para já é igual à password da keystore
 
-            clientSocket = Utils.initializeClient(trustStore, trustStorePassword, serverAddress, port);
+            clientSocket = UtilsClient.initializeClient(trustStore, trustStorePassword, serverAddress, port);
             clientSocket.startHandshake();
 
             // Inicializar os streams
@@ -109,36 +109,15 @@ public class IoTDevice {
             if (msgDevId.equals("NOK-DEVID")) {
                 System.out.println();
                 System.out.println("Device ID already in use.");
-                // System.out.print("Insere um novo Device ID: ");
-                // devId = sc.nextInt();
-                // out.writeObject(devId);
-                // out.flush();
-                // msgDevId = (String) in.readObject();
                 return;
             }
 
             System.out.println(msgDevId);
 
-            // O cliente envia o nome e o tamanho do ficheiro executável IoTDevice (.class)
-            String flName = "IoTDevice.class";
-            File f = new File(flName);
-            int flSize = (int) f.length();
+            // Receber resposta
+            String srvResponse = UtilsClient.exeCliTest(out, in);
 
-            FileInputStream fis = new FileInputStream(f);
-            BufferedInputStream bis = new BufferedInputStream(fis);
-            byte[] bytesBuffer = new byte[flSize];
-            long bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
-
-            out.writeObject(flName);
-            out.flush();
-            out.writeObject(bytesRd);
-            out.flush();
-            System.out.println("File Verification: " + flName + ":" + bytesRd + " sent to server!");
-            
-            // Receber a resposta do servidor
-            String srvResponse = (String) in.readObject();
-
-            if (srvResponse.equals("NOK-TESTED")) {
+            if (srvResponse.equals("NOK-TESTED") || srvResponse.equals("error") ) {
                 System.out.println("File not tested");
                 clientSocket.close();
                 System.exit(1);
@@ -295,8 +274,8 @@ public class IoTDevice {
     }
 
     public static boolean twoFactorAuth(Scanner sc, ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
-        boolean firstStep = Utils.assymCrypt(out, userId, in, tstore, kstore, kstorepass);
-        boolean secondStep = Utils.emailConf(sc, out, in, userId, tstore, kstore, kstorepass);
+        boolean firstStep = UtilsClient.assymCrypt(out, userId, in, tstore, kstore, kstorepass);
+        boolean secondStep = UtilsClient.emailConf(sc, out, in, userId, tstore, kstore, kstorepass);
 
         return firstStep && secondStep;
     }

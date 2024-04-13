@@ -1,69 +1,24 @@
-// Classe para colocar funções úteis que podem ser usadas em várias partes do código
-
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
-import java.util.Random;
 import java.util.Scanner;
 
-import javax.net.SocketFactory;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
-public class Utils {
-    
-    // // Função para inicializar a conexão com o servidor
-    // public static SSLServerSocket initializeServer(String keyStorePath, String keyStorePassword, int port) {
-    //     SSLServerSocket socket = null;
+public class UtilsClient {
 
-    //     System.setProperty("javax.net.ssl.keyStoreType", "JCEKS");
-    //     System.setProperty("javax.net.ssl.keyStore", keyStorePath);
-    //     System.setProperty("javax.net.ssl.keyStorePassword", keyStorePassword);
-
-    //     SSLServerSocketFactory factory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
-    //     try {
-    //         socket = (SSLServerSocket) factory.createServerSocket(port);
-    //     } catch (Exception e) {
-    //         e.printStackTrace();
-    //     }
-
-    //     return socket;
-    // }
-    public static SSLServerSocket initializeServer(String keyStorePath, String keyStorePassword, int port){
-        SSLServerSocket socket = null;
-        try {
-            // TLS/SSL
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            // Inicializa o contexto com a chave do servidor
-            // Substitua "server_keystore.jks" e "password" pelos seus valores
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            KeyStore keyStore = KeyStore.getInstance("JCEKS");
-            keyStore.load(new FileInputStream(keyStorePath), keyStorePassword.toCharArray());
-            keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
-            sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
-    
-            socket = (SSLServerSocket) sslContext.getServerSocketFactory().createServerSocket(port);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return socket;
-
-    }
-
-    
-
-    // public static SSLSocket initializeClient(String trusStrorePath, String trustStorePassword, String serverAddress, int port){
+     // public static SSLSocket initializeClient(String trusStrorePath, String trustStorePassword, String serverAddress, int port){
     //     SSLSocket s = null;
 
     //     System.setProperty("javax.net.ssl.trustStore", trusStrorePath);
@@ -78,6 +33,7 @@ public class Utils {
 
     //     return s;        
     // }
+
 
     public static SSLSocket initializeClient(String trustStorePath, String trustStorePassword, String serverAddress, int port) {
         SSLSocket socket = null;
@@ -107,13 +63,6 @@ public class Utils {
         return socket;
     }
 
-    public static String generateC2FA() {
-        Random random = new Random();
-        int randomNumber = random.nextInt(100000);
-        String fiveDigits = String.format("%05d", randomNumber);
-
-        return fiveDigits;
-    }
 
     public static boolean assymCrypt(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
         try {
@@ -252,4 +201,48 @@ public class Utils {
             return false;
         }
     }
+
+    // funcao para enviar o teste do ficheiro executável IoTDevice para o servidor
+    public static String exeCliTest(ObjectOutputStream out, ObjectInputStream in) {
+        try {
+            // O cliente envia o nome e o tamanho do ficheiro executável IoTDevice (.class)
+            byte[] nonce = (byte[]) in.readObject();
+
+            String flName = "IoTDevice.class";
+            File f = new File(flName);
+            int flSize = (int) f.length();
+
+            FileInputStream fis = new FileInputStream(f);
+            BufferedInputStream bis = new BufferedInputStream(fis);
+            byte[] bytesBuffer = new byte[flSize];
+            long bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
+
+            // Concatenar o nonce o conteudo do ficheiro
+            byte[] concatNonceFl = new byte[nonce.length + bytesBuffer.length];
+            System.arraycopy(nonce, 0, concatNonceFl, 0, nonce.length);
+            System.arraycopy(bytesBuffer, 0, concatNonceFl, nonce.length, bytesBuffer.length);
+
+            // Enviar o nome e o tamanho do ficheiro para o servidor
+            System.out.println("File Verification: " + flName + ":" + bytesRd + " sent to server!");
+            bis.close();
+
+            // calcular hash SHA256 de concatNameSize
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(concatNonceFl);
+
+            // Enviar o hash para o servidor
+            out.writeObject(hash);
+            out.flush();
+            
+            // Receber a resposta do servidor
+            String srvResponse = (String) in.readObject();
+
+            return srvResponse;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "error";
+        }
+    }
+    
 }
