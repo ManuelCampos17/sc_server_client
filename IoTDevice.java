@@ -106,14 +106,15 @@ public class IoTDevice {
 
             // Receber resposta
             String msgDevId = (String) in.readObject();
-            while (msgDevId.equals("NOK-DEVID")) {
+            if (msgDevId.equals("NOK-DEVID")) {
                 System.out.println();
                 System.out.println("Device ID em Utilização");
-                System.out.print("Insere um novo Device ID: ");
-                devId = sc.nextInt();
-                out.writeObject(devId);
-                out.flush();
-                msgDevId = (String) in.readObject();
+                // System.out.print("Insere um novo Device ID: ");
+                // devId = sc.nextInt();
+                // out.writeObject(devId);
+                // out.flush();
+                // msgDevId = (String) in.readObject();
+                return;
             }
 
             System.out.println(msgDevId);

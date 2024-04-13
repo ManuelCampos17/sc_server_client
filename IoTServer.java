@@ -105,7 +105,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("clientProgram.txt", true));
-                myWriterClient.write("IoTDevice.class:8964");
+                myWriterClient.write("IoTDevice.class:8838");
                 myWriterClient.close();
             } else 
             {
@@ -294,6 +294,14 @@ public class IoTServer {
                 //Handle Auth Dev-id (Later)
                 int dev_id = (int) in.readObject();
                 int currDevId = handleDevId(in, out, currUser, dev_id);
+
+                if (currDevId == -1) {
+                    out.close();
+                    in.close();
+                    clientSocket.close();
+                    System.out.println("-------|Attempted to connect with the same device id.|-------");
+                    return;
+                }
 
                 //Handle file size
                 String programName = (String) in.readObject();
@@ -914,10 +922,11 @@ public class IoTServer {
         }
 
         private static synchronized int handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, int dev_id) throws IOException, ClassNotFoundException {
-            while (connected.containsKey(user) && connected.get(user).contains(dev_id)) {
+            // se o user ja tiver um device com o mesmo id a ligacao termina
+            if (connected.containsKey(user) && connected.get(user).contains(dev_id)) {
                 out.writeObject("NOK-DEVID");
                 out.flush();
-                dev_id = (int) in.readObject();
+                return -1;
             }
 
             if (connected.containsKey(user)) {
