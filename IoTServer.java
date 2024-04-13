@@ -299,7 +299,9 @@ public class IoTServer {
                     out.close();
                     in.close();
                     clientSocket.close();
-                    System.out.println("-------|Attempted to connect with the same device id.|-------");
+                    System.out.println();
+                    System.out.println("-------|Attempted to connect with the same device id|-------");
+                    System.out.println();
                     return;
                 }
 

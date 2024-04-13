@@ -4,7 +4,7 @@
 // • <dev-id> - número inteiro que identifica o dispositivo.
 // • <user-id> - string que identifica o (endereço de email do) utilizador local.
 
-// IoTDevice <serverAddress> <dev-id> <user-id>
+// IoTDevice <serverAddress> <truststore> <keystore> <passwordkeystore> <dev-id> <user-id>
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -108,7 +108,7 @@ public class IoTDevice {
             String msgDevId = (String) in.readObject();
             if (msgDevId.equals("NOK-DEVID")) {
                 System.out.println();
-                System.out.println("Device ID em Utilização");
+                System.out.println("Device ID already in use.");
                 // System.out.print("Insere um novo Device ID: ");
                 // devId = sc.nextInt();
                 // out.writeObject(devId);
