@@ -58,6 +58,9 @@ public class IoTServer {
     //Usernames e passwords
     private static File userFile;
 
+    //App name e size
+    private static File clientProgramData;
+
     //Domain file
     private static File domainsInfo;
 
@@ -92,9 +95,32 @@ public class IoTServer {
 
         apiKey = args[4];
 
+
+
+        //Criar size e nome do client executable caso nao exista
+        serverLock.lock();
+        clientProgramData = new File("txtFiles/clientProgram.txt");
+        try {
+            if (clientProgramData.createNewFile()) {
+                System.out.println("Client file data created");
+
+                //Escrever nome e size
+                BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("txtFiles/clientProgram.txt", true));
+                myWriterClient.write("IoTDeviceCopy.class");
+                myWriterClient.close();
+            } else 
+            {
+                System.out.println("Client file data already exists.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            serverLock.unlock();
+        }
+
         serverLock.lock();
         //Criar file com info dos domains caso nao exista (vazio por agora)
-        domainsInfo = new File("domainsInfo.txt");
+        domainsInfo = new File("txtFiles/domainsInfo.txt");
         try {
             if (domainsInfo.createNewFile()) {
                 System.out.println("Domains file created");
@@ -115,7 +141,7 @@ public class IoTServer {
             System.out.println("Server initialized on port: " + port);
 
             //Criar user file caso nao exista
-            userFile = new File("users.txt");
+            userFile = new File("txtFiles/users.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
             } else {
@@ -123,7 +149,7 @@ public class IoTServer {
             }
             
             //Criar temps file caso nao exista
-            tempsFile = new File("tempsFile.txt");
+            tempsFile = new File("txtFiles/tempsFile.txt");
             if (tempsFile.createNewFile()) {
                 System.out.println("Temps file created");
             } else {
@@ -132,7 +158,7 @@ public class IoTServer {
 
             //Ir buscar as credentials que ja estao no file
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("users.txt"));
+                BufferedReader rb = new BufferedReader(new FileReader("txtFiles/users.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
@@ -148,7 +174,7 @@ public class IoTServer {
 
             //Ir buscar os dominios que ja estao no file
             try {
-                BufferedReader rbDevices = new BufferedReader(new FileReader("domainsInfo.txt"));
+                BufferedReader rbDevices = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
                 String lineDevices = rbDevices.readLine();
                 Map<String, LinkedList<String>> devicesListByDomain = new HashMap<String, LinkedList<String>>();
 
@@ -177,7 +203,7 @@ public class IoTServer {
 
                 LinkedList<String> domainsList = new LinkedList<String>();
 
-                BufferedReader rbUsers = new BufferedReader(new FileReader("domainsInfo.txt"));
+                BufferedReader rbUsers = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
                 String lineUsers = rbUsers.readLine();
                 Map<String, LinkedList<String>> usersListByDomain = new HashMap<String, LinkedList<String>>();
 
@@ -215,7 +241,7 @@ public class IoTServer {
             serverLock.lock();
             //Ir buscar as temps que ja estao no file
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("tempsFile.txt"));
+                BufferedReader rb = new BufferedReader(new FileReader("txtFiles/tempsFile.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
@@ -315,7 +341,7 @@ public class IoTServer {
                                 
                                 try{
                                     //Escrever no domains file
-                                    BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                                    BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                     myWriterDomainsCR.close();
@@ -349,7 +375,7 @@ public class IoTServer {
                                 newDomain.addUser(currUser);
                                 domains.add(newDomain);
                                 //Escrever no domains file
-                                BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("domainsInfo.txt", true));
+                                BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
                                 //O primeiro user é o creator
                                 myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
                                 myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
@@ -478,7 +504,7 @@ public class IoTServer {
 
                                 //Write no temps file
                                 tempsFile.delete();
-                                tempsFile = new File("tempsFile.txt");
+                                tempsFile = new File("txtFiles/tempsFile.txt");
 
                                 BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
 
@@ -573,7 +599,7 @@ public class IoTServer {
 
                             serverLock.lock();
                             try{
-                                BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+                                BufferedReader regReader = new BufferedReader(new FileReader("txtFiles/registeredDevices.txt"));
                                 String regReaderLine = regReader.readLine();
                                 LinkedList<String> devs = new LinkedList<String>();
 
@@ -721,7 +747,7 @@ public class IoTServer {
                             out.writeObject("checkedvalid");
                             out.flush();
 
-                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
+                            BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("txtFiles/users.txt", true));
                             myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
                             myWriterUsers.close();
                             userCredentials.put(userId, splitEmail[0] + ".cer");
@@ -842,7 +868,7 @@ public class IoTServer {
 
         private static boolean verifyUser(String userId) {
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("users.txt"));
+                BufferedReader rb = new BufferedReader(new FileReader("txtFiles/users.txt"));
                 String line = rb.readLine();
 
                 while (line != null){
@@ -871,7 +897,7 @@ public class IoTServer {
                 serverLock.lock();
                 try{
                     //Escrever no credentials file
-                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("users.txt", true));
+                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("txtFiles/users.txt", true));
                     myWriterUsers.write(login + System.getProperty("line.separator"));
                     myWriterUsers.close();
                     userCredentials.put(user, password);
@@ -925,7 +951,7 @@ public class IoTServer {
 
             //Criar registered devices history ou atualizar
             serverLock.lock();
-            regHist = new File("registeredDevices.txt");
+            regHist = new File("txtFiles/registeredDevices.txt");
             try {
                 if (regHist.createNewFile()) {
                     System.out.println("Registered devices history file created.");
@@ -941,7 +967,7 @@ public class IoTServer {
 
             serverLock.lock();
             try{
-                BufferedReader regReader = new BufferedReader(new FileReader("registeredDevices.txt"));
+                BufferedReader regReader = new BufferedReader(new FileReader("txtFiles/registeredDevices.txt"));
                 String regReaderLine = regReader.readLine();
                 LinkedList<String> devs = new LinkedList<String>();
 
@@ -961,7 +987,7 @@ public class IoTServer {
                 }
 
                 regHist.delete();
-                regHist = new File("registeredDevices.txt");
+                regHist = new File("txtFiles/registeredDevices.txt");
 
                 BufferedWriter myWriterRegs = new BufferedWriter(new FileWriter(regHist, true));
 
@@ -987,7 +1013,9 @@ public class IoTServer {
 
             serverLock.lock();
             try {
-                String flName = "IoTDeviceCopy.class";
+                BufferedReader progInfoReader = new BufferedReader(new FileReader("txtFiles/clientProgram.txt"));
+                String flName = progInfoReader.readLine();
+
                 File f = new File(flName);
                 int flSize = (int) f.length();
 
@@ -1018,6 +1046,8 @@ public class IoTServer {
                     out.flush();
                     retval = false;
                 }
+
+                progInfoReader.close();
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -1031,7 +1061,7 @@ public class IoTServer {
             serverLock.lock();
             try{
                 domainsInfo.delete();
-                domainsInfo = new File("domainsInfo.txt");
+                domainsInfo = new File("txtFiles/domainsInfo.txt");
     
                 BufferedWriter myWriterDomains = new BufferedWriter(new FileWriter(domainsInfo, true));
     

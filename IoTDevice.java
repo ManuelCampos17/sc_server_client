@@ -9,25 +9,14 @@
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.Signature;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.util.Scanner;
 
 import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
 
 // --------------------------------- //
 // --------------------------------- //

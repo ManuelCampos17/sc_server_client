@@ -19,7 +19,7 @@ Informações adicionais: Após iniciar o servidor, vários ficheiros de texto i
 
 clientProgram.txt --> Ficheiro que guarda de forma persistente o <nome do Executável e o seu tamanho> para verificar se o Client tem a versão correta do IoTDevice.
 
-userCredentials.txt --> Ficheiro que guarda os users existentes em formato <user>:<password>
+users.txt --> Ficheiro que guarda os users existentes em formato <user>:<password>
 
 domainsInfo.txt --> Ficheiro que guarda informações sobre os dominios e os respetivos <users> que se encontram nos mesmos, guardando também os devices associados a cada dominio. O 1º user que aparece à frente do nome do dominio é o seu Criador/Dono
 
