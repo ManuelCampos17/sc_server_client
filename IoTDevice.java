@@ -16,11 +16,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.util.Base64;
 import java.util.Scanner;
-
-import javax.crypto.SecretKey;
 import javax.net.ssl.SSLSocket;
 
 // --------------------------------- //
@@ -39,8 +35,6 @@ public class IoTDevice {
     private static final int DEFAULT_PORT = 12345;
     private static KeyStore kstore;
     private static KeyStore tstore;
-
-    private static final SecureRandom rd = new SecureRandom();
 
     public static void main(String[] args) {
         try {
@@ -150,35 +144,8 @@ public class IoTDevice {
                         continue;
                     } else {
                         String domainName = parts[1];
-                        System.out.println("Escolha uma password para o domain " + domainName + ":");
-                        String domainPass = sc.nextLine();
 
-                        //Gerar key com password
-                        byte[] salt = new byte[16];
-                        rd.nextBytes(salt);
-                        String encodedSalt = Base64.getEncoder().encodeToString(salt);
-
-                        int iter = rd.nextInt(1000) + 1;
-                        SecretKey domainKey = UtilsClient.generateDomainKey(domainPass, salt, iter);
-
-                        File keyProps = new File("txtFiles/myDomainKeys.txt");
-                        try {
-                            if (keyProps.createNewFile()) {
-                                System.out.println("My key props file created.");
-                            } else 
-                            {
-                                System.out.println("My key props file already exists.");
-                            }
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-
-                        //Criar o dar add dos parametros usados para criar a key ao file exclusivo do user myDomainKeys
-                        BufferedWriter keyPropWriter = new BufferedWriter(new FileWriter("txtFiles/myDomainKeys.txt", true));
-                        keyPropWriter.write(domainName + " (Password-Salt(Encoded)-Iterations):" + domainPass + "-" + encodedSalt + "-" + iter + System.getProperty("line.separator"));
-                        keyPropWriter.close();
-
-                        out.writeObject("CREATE " + domainName + domainPass);
+                        out.writeObject("CREATE " + domainName);
                         out.flush();
                     }
 
@@ -191,10 +158,7 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        String user = parts[1];
-                        String domainName = parts[2];
-                        String domainPass = parts[3];
-                        out.writeObject("ADD " + user + " " + domainName + " " + domainPass);
+                        out.writeObject("ADD " + parts[1] + " " + parts[2] + " " + parts[3]);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
