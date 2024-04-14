@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -338,7 +339,6 @@ public class IoTServer {
                                 newDomain.addUser(currUser);
                                 domains.add(newDomain);
 
-                                
                                 try{
                                     //Escrever no domains file
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
@@ -353,6 +353,7 @@ public class IoTServer {
                                 } finally {
                                     serverLock.unlock();
                                 }
+
                                 break;
                             }
                             
@@ -368,8 +369,8 @@ public class IoTServer {
 
                             if (found) break;
                             
-                            
                             serverLock.lock();
+
                             try{
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
                                 newDomain.addUser(currUser);
@@ -388,6 +389,7 @@ public class IoTServer {
                             } finally {
                                 serverLock.unlock();
                             }
+
                             break;
                         case "ADD":
                             serverLock.lock();

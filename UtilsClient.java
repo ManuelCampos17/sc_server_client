@@ -10,6 +10,9 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.util.Scanner;
 
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -242,6 +245,20 @@ public class UtilsClient {
             e.printStackTrace();
             return "error";
         }
+    }
+
+    public static SecretKey generateDomainKey(String password, byte[] salt, int iter) {
+        SecretKey sk = null;
+
+        try {
+            PBEKeySpec keySpec = new PBEKeySpec(password.toCharArray(), salt, iter, 128);
+            SecretKeyFactory kf = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
+            sk = kf.generateSecret(keySpec);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return sk;
     }
     
 }

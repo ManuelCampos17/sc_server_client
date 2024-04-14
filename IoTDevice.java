@@ -10,12 +10,17 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.util.Base64;
 import java.util.Scanner;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.SSLSocket;
 
 // --------------------------------- //
@@ -34,6 +39,8 @@ public class IoTDevice {
     private static final int DEFAULT_PORT = 12345;
     private static KeyStore kstore;
     private static KeyStore tstore;
+
+    private static final SecureRandom rd = new SecureRandom();
 
     public static void main(String[] args) {
         try {
@@ -119,7 +126,7 @@ public class IoTDevice {
             // Mostrar menu de opções
             System.out.println("Menu de Opções:");
             System.out.println("CREATE <dm> # Criar domínio - utilizador é Owner");
-            System.out.println("ADD <user1> <dm> # Adicionar utilizador <user1> ao domínio <dm>");
+            System.out.println("ADD <user1> <dm> <password-dominio> # Adicionar utilizador <user1> ao domínio <dm>");
             System.out.println("RD <dm> # Registar o Dispositivo atual no domínio <dm>");
             System.out.println("ET <float> # Enviar valor <float> de Temperatura para o servidor.");
             System.out.println("EI <filename.jpg> # Enviar Imagem <filename.jpg> para o servidor.");
@@ -143,21 +150,51 @@ public class IoTDevice {
                         continue;
                     } else {
                         String domainName = parts[1];
-                        out.writeObject("CREATE " + domainName);
+                        System.out.println("Escolha uma password para o domain " + domainName + ":");
+                        String domainPass = sc.nextLine();
+
+                        //Gerar key com password
+                        byte[] salt = new byte[16];
+                        rd.nextBytes(salt);
+                        String encodedSalt = Base64.getEncoder().encodeToString(salt);
+
+                        int iter = rd.nextInt(1000) + 1;
+                        SecretKey domainKey = UtilsClient.generateDomainKey(domainPass, salt, iter);
+
+                        File keyProps = new File("txtFiles/myDomainKeys.txt");
+                        try {
+                            if (keyProps.createNewFile()) {
+                                System.out.println("My key props file created.");
+                            } else 
+                            {
+                                System.out.println("My key props file already exists.");
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+
+                        //Criar o dar add dos parametros usados para criar a key ao file exclusivo do user myDomainKeys
+                        BufferedWriter keyPropWriter = new BufferedWriter(new FileWriter("txtFiles/myDomainKeys.txt", true));
+                        keyPropWriter.write(domainName + " (Password-Salt(Encoded)-Iterations):" + domainPass + "-" + encodedSalt + "-" + iter + System.getProperty("line.separator"));
+                        keyPropWriter.close();
+
+                        out.writeObject("CREATE " + domainName + domainPass);
                         out.flush();
                     }
+
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("ADD")) {
 
-                    if (parts.length != 3) {
+                    if (parts.length != 4) {
                         System.out.println("Invalid command");
                         continue;
                     } else {
                         String user = parts[1];
                         String domainName = parts[2];
-                        out.writeObject("ADD " + user + " " + domainName);
+                        String domainPass = parts[3];
+                        out.writeObject("ADD " + user + " " + domainName + " " + domainPass);
                         out.flush();
                     }
                     srvResponse = (String) in.readObject();
