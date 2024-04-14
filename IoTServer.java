@@ -16,14 +16,12 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
@@ -73,9 +71,7 @@ public class IoTServer {
     //Registered devices history
     private static File regHist;
 
-    private static final SecureRandom rd = new SecureRandom();
-
-    private static volatile Map<String, Cipher> domainUserCipher = new HashMap<String, Cipher>();
+    private static volatile Map<String, byte[]> domainUserKeys = new HashMap<String, byte[]>();
 
     public static void main(String[] args) {
         port = DEFAULT_PORT;
@@ -440,31 +436,8 @@ public class IoTServer {
                                     break;
                                 }
 
-                                //Gerar key com password
-                                byte[] salt = new byte[16];
-                                rd.nextBytes(salt);
-
-                                //Guardar?
-                                String encodedSalt = Base64.getEncoder().encodeToString(salt);
-                                out.writeObject(encodedSalt);
-                                out.flush();
-
-                                //Guardar?
-                                int iter = rd.nextInt(1000) + 1;
-
-                                SecretKey domainKey = UtilsServer.generateDomainKey(reqSplit[3], salt, iter);
-
-                                FileInputStream fis = new FileInputStream(reqSplit[1] + ".cer");
-                                CertificateFactory cf = CertificateFactory.getInstance("X509");
-                                Certificate cert = cf.generateCertificate(fis);
-                                PublicKey destUserPubKey = cert.getPublicKey();
-                                fis.close();
-
-                                Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                                c.init(Cipher.ENCRYPT_MODE, destUserPubKey);
-                                c.doFinal(domainKey.getEncoded());
-
-                                domainUserCipher.put(reqSplit[2] + "-" + reqSplit[1] , c);
+                                byte[] cyDomainKey = (byte[]) in.readObject();
+                                domainUserKeys.put(reqSplit[2] + "-" + reqSplit[1], cyDomainKey);
 
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
@@ -615,10 +588,17 @@ public class IoTServer {
                                 long bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
 
                                 out.writeObject("OK");
+                                out.flush();
+
                                 out.writeObject(bytesReadRT);
                                 out.flush();
+
                                 out.write(bufferRT);
                                 out.flush();
+
+                                out.writeObject(domainUserKeys.get(reqSplit[1] + "-" + currUser));
+                                out.flush();
+
                                 inputRT.close();
                                 finRT.close();
                                 rtFile.delete();
@@ -630,6 +610,7 @@ public class IoTServer {
                             break;
                         case "RI":
                             String[] userDataRI = reqSplit[1].split(":");
+                            byte[] domKey = null;
 
                             serverLock.lock();
                             try{
@@ -668,6 +649,7 @@ public class IoTServer {
                                             //Check read perms
                                             if (dom.getUsers().contains(currUser)) {
                                                 hasPerms = true;
+                                                domKey = domainUserKeys.get(dom.getName() + "-" + userDataRI[0]);
                                             }
                                         }
                                     }
@@ -688,6 +670,9 @@ public class IoTServer {
 
                             try {
                                 ri(userDataRI[0] + "_" + userDataRI[1] + ".jpg", in, out);
+
+                                out.writeObject(domKey);
+                                out.flush();
                             } catch (Exception e) {
                                 System.out.println("An error occurred: " + e.getMessage());
                                 e.printStackTrace();

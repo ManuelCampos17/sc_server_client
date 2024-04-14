@@ -9,14 +9,23 @@
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.security.Key;
 import java.security.KeyStore;
+import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.util.Base64;
 import java.util.Scanner;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLSocket;
 
 // --------------------------------- //
@@ -35,6 +44,8 @@ public class IoTDevice {
     private static final int DEFAULT_PORT = 12345;
     private static KeyStore kstore;
     private static KeyStore tstore;
+
+    private static final SecureRandom rd = new SecureRandom();
 
     public static void main(String[] args) {
         try {
@@ -158,9 +169,28 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
+                        //Gerar key com password - falta guardar os params
+                        byte[] salt = new byte[16];
+                        rd.nextBytes(salt);
+
+                        int iter = rd.nextInt(1000) + 1;
+
+                        SecretKey domainKey = UtilsClient.generateDomainKey(parts[3], salt, iter);
+
+                        Certificate cert = tstore.getCertificate(parts[1]);
+                        PublicKey destUserPubKey = cert.getPublicKey();
+
+                        Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                        c.init(Cipher.ENCRYPT_MODE, destUserPubKey);
+                        byte[] dkSend = c.doFinal(domainKey.getEncoded());
+
                         out.writeObject("ADD " + parts[1] + " " + parts[2] + " " + parts[3]);
                         out.flush();
+
+                        out.writeObject(dkSend);
+                        out.flush();
                     }
+
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
@@ -225,7 +255,22 @@ public class IoTDevice {
                                 break;
                             bytesRead += count;
                         }
-                        String fileContent = new String(buffer);
+
+                        byte[] recKey = (byte[]) in.readObject();
+
+                        Cipher dKey = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                        Key myPrivateKey = kstore.getKey(userId.split("@")[0], kstorepass);
+                        dKey.init(Cipher.DECRYPT_MODE, myPrivateKey);
+                        byte[] decKey = dKey.doFinal(recKey);
+
+                        SecretKey secretKey = new SecretKeySpec(decKey, "AES");
+
+                        Cipher dData = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                        dData.init(Cipher.DECRYPT_MODE, secretKey);
+                        byte [] dec = dData.doFinal(buffer);
+
+                        String fileContent = new String(dec);
+
                         System.out.println(srvResponse + ", " + fileSize + " (long), " + fileContent);
                     }
                     else 
@@ -248,7 +293,7 @@ public class IoTDevice {
                     String[] reqUser = parts[1].split(":");
 
                     if (srvResponse.startsWith("OK")) {
-                        ri(reqUser[0], Integer.parseInt(reqUser[1]), in, out);
+                        ri(reqUser[0], Integer.parseInt(reqUser[1]), in, out, kstorepass);
                     }else{
                         System.out.println(srvResponse);
                     }
@@ -330,7 +375,7 @@ public class IoTDevice {
         }
     }
 
-    public static synchronized void ri(String name, int devid, ObjectInputStream in, ObjectOutputStream out){
+    public static synchronized void ri(String name, int devid, ObjectInputStream in, ObjectOutputStream out, char[] kpass){
             String destinationFileName = name + "_" + devid + "_received" + ".jpg";
 
             try {
@@ -349,13 +394,26 @@ public class IoTDevice {
                     throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
                 }
 
+                byte[] recKey = (byte[]) in.readObject();
+
+                Cipher dKey = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                Key myPrivateKey = kstore.getKey(name, kpass);
+                dKey.init(Cipher.DECRYPT_MODE, myPrivateKey);
+                byte[] decKey = dKey.doFinal(recKey);
+
+                SecretKey secretKey = new SecretKeySpec(decKey, "AES");
+
+                Cipher dData = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                dData.init(Cipher.DECRYPT_MODE, secretKey);
+                byte [] dec = dData.doFinal(buffer);
+
                 // Write received file data to the destination file
                 FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
-                fileOutputStream.write(buffer, 0, totalBytesRead);
+                fileOutputStream.write(dec, 0, totalBytesRead);
                 fileOutputStream.close();
 
                 System.out.println("OK, " + fileSize + " (long)");
-            } catch (IOException e) {
+            } catch (Exception e) {
                 System.out.println("An error occurred: " + e.getMessage());
                 e.printStackTrace();
             }
