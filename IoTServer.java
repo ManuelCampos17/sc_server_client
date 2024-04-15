@@ -862,6 +862,8 @@ public class IoTServer {
                         rb.close();
                         return true;
                     }
+
+                    line = rb.readLine();
                 }
 
                 rb.close();
