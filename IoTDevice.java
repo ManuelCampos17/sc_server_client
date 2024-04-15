@@ -21,6 +21,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.Base64;
+import java.util.LinkedList;
 import java.util.Scanner;
 
 import javax.crypto.Cipher;
@@ -214,6 +215,20 @@ public class IoTDevice {
                     } else {
                         out.writeObject("ET" + " " + parts[1]);
                         out.flush();
+
+                        int myDomSize = (int) in.readObject();
+
+                        for (int i = 0; i < myDomSize; i++) {
+                            byte[] key = (byte[]) in.readObject();
+                            SecretKey secretKey = new SecretKeySpec(key, "AES");
+
+                            Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                            c.init(Cipher.ENCRYPT_MODE, secretKey);
+                            byte[] ciphInfo = c.doFinal(parts[1].getBytes());
+
+                            out.writeObject(ciphInfo);
+                            out.flush();
+                        }
                     }
                     srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);

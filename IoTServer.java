@@ -22,7 +22,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -54,6 +56,7 @@ public class IoTServer {
     private static volatile Map<String, LinkedList<Integer>> connected = new HashMap<String, LinkedList<Integer>>();
 
     //Last device temp
+    private static volatile Map<String, byte[]> tempsByDomain = new HashMap<String, byte[]>();
     private static volatile Map<String, Float> temps = new HashMap<String, Float>();
 
     //Usernames e passwords
@@ -71,7 +74,7 @@ public class IoTServer {
     //Registered devices history
     private static File regHist;
 
-    private static volatile Map<String, byte[]> domainUserKeys = new HashMap<String, byte[]>();
+    private static volatile Map<String, byte[]> domainKeys = new HashMap<String, byte[]>();
 
     public static void main(String[] args) {
         port = DEFAULT_PORT;
@@ -437,7 +440,7 @@ public class IoTServer {
                                 }
 
                                 byte[] cyDomainKey = (byte[]) in.readObject();
-                                domainUserKeys.put(reqSplit[2] + "-" + reqSplit[1], cyDomainKey);
+                                domainKeys.put(reqSplit[2] + "_" + currUser, cyDomainKey);
 
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
@@ -507,6 +510,19 @@ public class IoTServer {
 
                             serverLock.lock();
                             try{
+                                LinkedList<String> userDomains = getUserDomains(currUser);
+
+                                out.writeObject(userDomains.size());
+                                out.flush();
+
+                                for (int i = 0; i < userDomains.size(); i++) {
+                                    out.writeObject(domainKeys.get(userDomains.get(i) + "_" + currUser));
+                                    out.flush();
+
+                                    byte[] ciphTemp = (byte[]) in.readObject();
+                                    tempsByDomain.put(currUser + "_" + currDevId + "_" + userDomains.get(i), ciphTemp);
+                                }
+
                                 temps.put(currUser + "_" + currDevId, Float.parseFloat(reqSplit[1]));
 
                                 //Write no temps file
@@ -593,10 +609,15 @@ public class IoTServer {
                                 out.writeObject(bytesReadRT);
                                 out.flush();
 
-                                out.write(bufferRT);
+                                Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                                SecretKey secretKey = new SecretKeySpec(domainKeys.get(rtDomain.getName() + "_" + currUser), "AES");
+                                c.init(Cipher.ENCRYPT_MODE, secretKey);
+                                byte[] ciphTemps = c.doFinal(bufferRT);
+
+                                out.write(ciphTemps);
                                 out.flush();
 
-                                out.writeObject(domainUserKeys.get(reqSplit[1] + "-" + currUser));
+                                out.writeObject(domainKeys.get(reqSplit[1]) + "_" + currUser);
                                 out.flush();
 
                                 inputRT.close();
@@ -649,7 +670,7 @@ public class IoTServer {
                                             //Check read perms
                                             if (dom.getUsers().contains(currUser)) {
                                                 hasPerms = true;
-                                                domKey = domainUserKeys.get(dom.getName() + "-" + userDataRI[0]);
+                                                domKey = domainKeys.get(dom.getName() + "_" + currUser);
                                             }
                                         }
                                     }
@@ -701,6 +722,18 @@ public class IoTServer {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+
+        private LinkedList<String> getUserDomains(String user) {
+            LinkedList<String> ret = new LinkedList<String>();
+
+            for (Domain d : domains) {
+                if (d.getUsers().contains(user)) {
+                    ret.add(d.getName());
+                }
+            }
+
+            return ret;
         }
 
         private void authOperations(ObjectInputStream in, ObjectOutputStream out) {
