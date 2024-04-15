@@ -26,6 +26,7 @@ import java.util.Scanner;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLSocket;
 
@@ -74,7 +75,8 @@ public class IoTDevice {
 
             char[] kstorepass = args[3].toCharArray();
 
-            kstore.load(kfile, kstorepass);           //password para aceder à keystore
+            kstore.load(kfile, kstorepass);                  //password para aceder à keystore
+            tstore.load(tfile, "grupoquinze".toCharArray()); //password para aceder à truststore
 
             if (addr.length == 1) {
                 serverAddress = addr[0];
@@ -170,29 +172,36 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        //Gerar key com password - falta guardar os params
-                        byte[] salt = new byte[16];
-                        rd.nextBytes(salt);
-
-                        int iter = rd.nextInt(1000) + 1;
-
-                        SecretKey domainKey = UtilsClient.generateDomainKey(parts[3], salt, iter);
-
-                        Certificate cert = tstore.getCertificate(parts[1]);
-                        PublicKey destUserPubKey = cert.getPublicKey();
-
-                        Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                        c.init(Cipher.ENCRYPT_MODE, destUserPubKey);
-                        byte[] dkSend = c.doFinal(domainKey.getEncoded());
-
                         out.writeObject("ADD " + parts[1] + " " + parts[2] + " " + parts[3]);
                         out.flush();
 
-                        out.writeObject(dkSend);
-                        out.flush();
+                        try {
+                            srvResponse = (String) in.readObject();
+
+                            if (srvResponse.equals("OK")) {
+                                //Gerar key com password - falta guardar os params
+                                byte[] salt = new byte[16];
+                                rd.nextBytes(salt);
+
+                                int iter = rd.nextInt(1000) + 1;
+
+                                SecretKey domainKey = UtilsClient.generateDomainKey(parts[3], salt, iter);
+
+                                Certificate cert = tstore.getCertificate(parts[1].split("@")[0]);
+                                PublicKey destUserPubKey = cert.getPublicKey();
+
+                                Cipher c = Cipher.getInstance("RSA");
+                                c.init(Cipher.ENCRYPT_MODE, destUserPubKey);
+                                byte[] dkSend = c.doFinal(domainKey.getEncoded());
+
+                                out.writeObject(dkSend);
+                                out.flush();
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
 
-                    srvResponse = (String) in.readObject();
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RD")) {
@@ -213,24 +222,36 @@ public class IoTDevice {
                         System.out.println("Invalid command");
                         continue;
                     } else {
-                        out.writeObject("ET" + " " + parts[1]);
-                        out.flush();
-
-                        int myDomSize = (int) in.readObject();
-
-                        for (int i = 0; i < myDomSize; i++) {
-                            byte[] key = (byte[]) in.readObject();
-                            SecretKey secretKey = new SecretKeySpec(key, "AES");
-
-                            Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                            c.init(Cipher.ENCRYPT_MODE, secretKey);
-                            byte[] ciphInfo = c.doFinal(parts[1].getBytes());
-
-                            out.writeObject(ciphInfo);
+                        try {
+                            out.writeObject("ET" + " " + parts[1]);
                             out.flush();
+
+                            srvResponse = (String) in.readObject();
+
+                            int myDomSize = (int) in.readObject();
+
+                            LinkedList<SecretKey> recSKeys = new LinkedList<SecretKey>();
+
+                            for (int i = 0; i < myDomSize; i++) {
+                                byte[] key = (byte[]) in.readObject();
+                                SecretKey secretKey = new SecretKeySpec(key, "AES");
+
+                                recSKeys.add(secretKey);
+                            }
+
+                            for (int i = 0; i < myDomSize; i++) {
+                                Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                                c.init(Cipher.ENCRYPT_MODE, recSKeys.get(i));
+                                byte[] ciphInfo = c.doFinal(parts[1].getBytes());
+
+                                out.writeObject(ciphInfo);
+                                out.flush();
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
-                    srvResponse = (String) in.readObject();
+
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("EI")) {

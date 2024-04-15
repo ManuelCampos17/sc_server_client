@@ -438,6 +438,9 @@ public class IoTServer {
                                     out.flush();
                                     break;
                                 }
+                                
+                                out.writeObject("OK");
+                                out.flush();
 
                                 byte[] cyDomainKey = (byte[]) in.readObject();
                                 domainKeys.put(reqSplit[2] + "_" + currUser, cyDomainKey);
@@ -447,9 +450,7 @@ public class IoTServer {
                                 domains.add(selectedDomADD);
     
                                 updateDomainsFile();
-    
-                                out.writeObject("OK");
-                                out.flush();
+
                             } catch (IOException e) {
                                 e.printStackTrace();
                             } finally {
@@ -518,7 +519,9 @@ public class IoTServer {
                                 for (int i = 0; i < userDomains.size(); i++) {
                                     out.writeObject(domainKeys.get(userDomains.get(i) + "_" + currUser));
                                     out.flush();
+                                }
 
+                                for (int i = 0; i < userDomains.size(); i++) {
                                     byte[] ciphTemp = (byte[]) in.readObject();
                                     tempsByDomain.put(currUser + "_" + currDevId + "_" + userDomains.get(i), ciphTemp);
                                 }
@@ -806,7 +809,7 @@ public class IoTServer {
 
                             LinkedList<Integer> newUserDevIds = new LinkedList<>();
 
-                            connected.put(userId.split("@")[0], newUserDevIds);
+                            connected.put(userId, newUserDevIds);
                         }
                         else 
                         {
@@ -818,8 +821,7 @@ public class IoTServer {
                     e.printStackTrace();
                 }
 
-                String[] temp = userId.split("@");
-                currUser = temp[0];
+                currUser = userId;
 
                 //4.2.2
                 String C2FA = UtilsServer.generateC2FA();
