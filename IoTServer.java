@@ -619,12 +619,7 @@ public class IoTServer {
                                 out.writeObject(bytesReadRT);
                                 out.flush();
 
-                                Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                                SecretKey secretKey = new SecretKeySpec(domainKeys.get(rtDomain.getName() + "_" + currUser), "AES");
-                                c.init(Cipher.ENCRYPT_MODE, secretKey);
-                                byte[] ciphTemps = c.doFinal(bufferRT);
-
-                                out.write(ciphTemps);
+                                out.write(bufferRT);
                                 out.flush();
 
                                 out.writeObject(domainKeys.get(reqSplit[1]) + "_" + currUser);

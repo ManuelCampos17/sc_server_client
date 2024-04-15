@@ -243,7 +243,7 @@ public class IoTDevice {
                                 recSKeys.add(secretKey);
                             }
 
-                            for (int i = 0; i < myDomSize; i++) {
+                            for (int i = 0; i < recSKeys.size(); i++) {
                                 Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
                                 c.init(Cipher.ENCRYPT_MODE, recSKeys.get(i));
                                 byte[] ciphInfo = c.doFinal(parts[1].getBytes());
