@@ -196,6 +196,12 @@ public class IoTDevice {
 
                                 out.writeObject(dkSend);
                                 out.flush();
+
+                                out.writeObject(salt);
+                                out.flush();
+
+                                out.writeObject(iter);
+                                out.flush();
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -233,9 +239,7 @@ public class IoTDevice {
                             LinkedList<SecretKey> recSKeys = new LinkedList<SecretKey>();
 
                             for (int i = 0; i < myDomSize; i++) {
-                                byte[] key = (byte[]) in.readObject();
-                                SecretKey secretKey = new SecretKeySpec(key, "AES");
-
+                                SecretKey secretKey = (SecretKey) in.readObject();
                                 recSKeys.add(secretKey);
                             }
 

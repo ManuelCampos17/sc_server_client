@@ -75,6 +75,7 @@ public class IoTServer {
     private static File regHist;
 
     private static volatile Map<String, byte[]> domainKeys = new HashMap<String, byte[]>();
+    private static volatile Map<String, SecretKey> genericDomainKeys = new HashMap<String, SecretKey>();
 
     public static void main(String[] args) {
         port = DEFAULT_PORT;
@@ -445,6 +446,12 @@ public class IoTServer {
                                 byte[] cyDomainKey = (byte[]) in.readObject();
                                 domainKeys.put(reqSplit[2] + "_" + currUser, cyDomainKey);
 
+                                byte[] salt = (byte[]) in.readObject();
+                                int iter = (int) in.readObject();
+
+                                SecretKey genDomKey = UtilsClient.generateDomainKey(reqSplit[3], salt, iter);
+                                genericDomainKeys.put(reqSplit[2], genDomKey);
+
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
                                 domains.add(selectedDomADD);
@@ -517,7 +524,7 @@ public class IoTServer {
                                 out.flush();
 
                                 for (int i = 0; i < userDomains.size(); i++) {
-                                    out.writeObject(domainKeys.get(userDomains.get(i) + "_" + currUser));
+                                    out.writeObject(genericDomainKeys.get(userDomains.get(i)));
                                     out.flush();
                                 }
 
