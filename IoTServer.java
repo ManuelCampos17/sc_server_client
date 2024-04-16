@@ -6,6 +6,7 @@ import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.MessageDigest;
@@ -57,7 +58,7 @@ public class IoTServer {
 
     //Last device temp
     private static volatile Map<String, byte[]> tempsByDomain = new HashMap<String, byte[]>();
-    private static volatile Map<String, Float> temps = new HashMap<String, Float>();
+    private static volatile Map<String, byte[]> tempsByDomainParams = new HashMap<String, byte[]>();
 
     //Usernames e passwords
     private static File userFile;
@@ -75,7 +76,6 @@ public class IoTServer {
     private static File regHist;
 
     private static volatile Map<String, byte[]> domainKeys = new HashMap<String, byte[]>();
-    private static volatile Map<String, SecretKey> genericDomainKeys = new HashMap<String, SecretKey>();
 
     public static void main(String[] args) {
         port = DEFAULT_PORT;
@@ -253,7 +253,7 @@ public class IoTServer {
 
                 while (line != null){
                     String[] userTemp = line.split(":");
-                    temps.put(userTemp[0], Float.parseFloat(userTemp[1]));
+                    tempsByDomain.put(userTemp[0], userTemp[1].getBytes(StandardCharsets.UTF_8));
                     line = rb.readLine();
                 }
 
@@ -342,13 +342,12 @@ public class IoTServer {
                             if (domains.isEmpty()) {
                                 serverLock.lock();
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
-                                newDomain.addUser(currUser);
                                 domains.add(newDomain);
 
                                 try{
                                     //Escrever no domains file
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
-                                    myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
+                                    myWriterDomainsCR.write(reqSplit[1] + " (Users):" + System.getProperty("line.separator"));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                     myWriterDomainsCR.close();
 
@@ -379,12 +378,11 @@ public class IoTServer {
 
                             try{
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
-                                newDomain.addUser(currUser);
                                 domains.add(newDomain);
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
                                 //O primeiro user é o creator
-                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + currUser + System.getProperty("line.separator"));
+                                myWriterDomainsCR.write(reqSplit[1] + " (Users):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
 
@@ -446,12 +444,6 @@ public class IoTServer {
                                 byte[] cyDomainKey = (byte[]) in.readObject();
                                 domainKeys.put(reqSplit[2] + "_" + currUser, cyDomainKey);
 
-                                byte[] salt = (byte[]) in.readObject();
-                                int iter = (int) in.readObject();
-
-                                SecretKey genDomKey = UtilsClient.generateDomainKey(reqSplit[3], salt, iter);
-                                genericDomainKeys.put(reqSplit[2], genDomKey);
-
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
                                 domains.add(selectedDomADD);
@@ -491,7 +483,17 @@ public class IoTServer {
                                 }
 
                                 domains.remove(selectedDomRD);
-                                selectedDomRD.addDevice(currUser + "_" + currDevId);;
+
+                                if (selectedDomRD.getDevices() == null) {
+                                    LinkedList<String> addDevs = new LinkedList<String>();
+                                    addDevs.add(currUser + "_" + currDevId);
+                                    selectedDomRD.setDevices(addDevs);
+                                }
+                                else 
+                                {
+                                    selectedDomRD.addDevice(currUser + "_" + currDevId);
+                                }
+
                                 domains.add(selectedDomRD);
                                 
                                 updateDomainsFile();
@@ -518,22 +520,22 @@ public class IoTServer {
 
                             serverLock.lock();
                             try{
-                                LinkedList<String> userDomains = getUserDomains(currUser);
+                                LinkedList<String> deviceDomains = getDeviceDomains(currUser, currDevId);
 
-                                out.writeObject(userDomains.size());
+                                out.writeObject(deviceDomains.size());
                                 out.flush();
 
-                                for (int i = 0; i < userDomains.size(); i++) {
-                                    out.writeObject(genericDomainKeys.get(userDomains.get(i)));
+                                for (int i = 0; i < deviceDomains.size(); i++) {
+                                    out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
                                     out.flush();
                                 }
 
-                                for (int i = 0; i < userDomains.size(); i++) {
+                                for (int i = 0; i < deviceDomains.size(); i++) {
                                     byte[] ciphTemp = (byte[]) in.readObject();
-                                    tempsByDomain.put(currUser + "_" + currDevId + "_" + userDomains.get(i), ciphTemp);
+                                    byte[] paramsTemp = (byte[]) in.readObject();
+                                    tempsByDomain.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), ciphTemp);
+                                    tempsByDomainParams.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), paramsTemp);
                                 }
-
-                                temps.put(currUser + "_" + currDevId, Float.parseFloat(reqSplit[1]));
 
                                 //Write no temps file
                                 tempsFile.delete();
@@ -541,7 +543,7 @@ public class IoTServer {
 
                                 BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
 
-                                for (Map.Entry<String, Float> set : temps.entrySet()) {
+                                for (Map.Entry<String, byte[]> set : tempsByDomain.entrySet()) {
                                     etFileWriter.write(set.getKey() + ":" + set.getValue() + System.getProperty("line.separator"));
                                 }
 
@@ -559,10 +561,6 @@ public class IoTServer {
                         case "RT":
                             serverLock.lock();
                             try {
-                                //Primeiro criar o file para enviar
-                                File rtFile = new File("tempsFileSend.txt");
-
-                                BufferedWriter rtFileWriter = new BufferedWriter(new FileWriter(rtFile, true));
                                 Domain rtDomain = null;
 
                                 for (Domain dom : domains) {
@@ -572,8 +570,6 @@ public class IoTServer {
                                         if (!dom.getUsers().contains(currUser)) {
                                             out.writeObject("NOPERM # sem permissoes de leitura");
                                             out.flush();
-                                            rtFileWriter.close();
-                                            rtFile.delete();
                                             break;
                                         }
 
@@ -584,50 +580,55 @@ public class IoTServer {
                                 if (rtDomain == null) {
                                     out.writeObject("NODM # esse dominio nao existe");
                                     out.flush();
-                                    rtFileWriter.close();
-                                    rtFile.delete();
                                     break;
                                 }
 
-                                if (temps.isEmpty()) {
+                                if (tempsByDomain.isEmpty()) {
                                     out.writeObject("NODATA # nao existem dados de temperatura publicados");
                                     out.flush();
-                                    rtFileWriter.close();
-                                    rtFile.delete();
                                     break;
                                 }
-
-                                for (int i = 0; i < rtDomain.getDevices().size(); i++) {
-                                    String currId = rtDomain.getDevices().get(i);
-
-                                    if (temps.containsKey(currId)) {
-                                        rtFileWriter.write(currId + ":" + temps.get(currId) + " ");
-                                    }
-                                }
-
-                                rtFileWriter.close();
-
-                                //Enviar o filesize e o file
-                                FileInputStream finRT = new FileInputStream(rtFile);
-                                InputStream inputRT = new BufferedInputStream(finRT);
-                                byte[] bufferRT = new byte[(int)rtFile.length()];
-                                long bytesReadRT = inputRT.read(bufferRT,0,bufferRT.length);
 
                                 out.writeObject("OK");
                                 out.flush();
-
-                                out.writeObject(bytesReadRT);
+                                
+                                out.writeObject(domainKeys.get(reqSplit[1] + "_" + currUser));
                                 out.flush();
 
-                                out.write(bufferRT);
+                                int resSize = 0;
+
+                                for (Map.Entry<String, byte[]> entry : tempsByDomain.entrySet()) {
+                                    String key = entry.getKey();
+                                    String[] splitKey = key.split("_");
+                                    String entDom = splitKey[2];
+
+                                    if (entDom.equals(reqSplit[1])) {
+                                        resSize++;
+                                    }
+                                }
+
+                                out.writeObject(resSize);
                                 out.flush();
 
-                                out.writeObject(domainKeys.get(reqSplit[1]) + "_" + currUser);
-                                out.flush();
+                                for (Map.Entry<String, byte[]> entry : tempsByDomain.entrySet()) {
+                                    String key = entry.getKey();
+                                    String[] splitKey = key.split("_");
+                                    String entUser = splitKey[0] + "_" + splitKey[1];
+                                    String entDom = splitKey[2];
 
-                                inputRT.close();
-                                finRT.close();
-                                rtFile.delete();
+                                    byte[] value = entry.getValue();
+
+                                    if (entDom.equals(reqSplit[1])) {
+                                        out.writeObject(entUser);
+                                        out.flush();
+
+                                        out.writeObject(value);
+                                        out.flush();
+
+                                        out.writeObject(tempsByDomainParams.get(entUser + "_" + reqSplit[1]));
+                                        out.flush();
+                                    }
+                                }
                             } catch (IOException e) {
                                 e.printStackTrace();
                             } finally {
@@ -729,11 +730,11 @@ public class IoTServer {
             }
         }
 
-        private LinkedList<String> getUserDomains(String user) {
+        private LinkedList<String> getDeviceDomains(String user, int devid) {
             LinkedList<String> ret = new LinkedList<String>();
 
             for (Domain d : domains) {
-                if (d.getUsers().contains(user)) {
+                if (d.getDevices().contains(user + "_" + devid)) {
                     ret.add(d.getName());
                 }
             }
@@ -944,47 +945,6 @@ public class IoTServer {
             }
 
             return false;
-        }
-
-        private static synchronized void handleAuth(ObjectInputStream in, ObjectOutputStream out, String login, String user, String password) throws IOException, ClassNotFoundException {
-            if (!userCredentials.containsKey(user)) {
-                //Novo user
-
-                LinkedList<Integer> newUserDevIds = new LinkedList<>();
-
-                serverLock.lock();
-                try{
-                    //Escrever no credentials file
-                    BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("txtFiles/users.txt", true));
-                    myWriterUsers.write(login + System.getProperty("line.separator"));
-                    myWriterUsers.close();
-                    userCredentials.put(user, password);
-
-                    out.writeObject("OK-NEW-USER");
-                    out.flush();
-
-                    connected.put(user, newUserDevIds);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    serverLock.unlock();
-                }
-            }
-            else
-            {
-                //User existe
-
-                //Auth password
-                String currPass = password;
-                while (!userCredentials.get(user).equals(currPass)) {
-                    out.writeObject("WRONG-PWD");
-                    out.flush();
-                    currPass = (String) in.readObject();
-                }
-
-                out.writeObject("OK-USER");
-                out.flush();
-            }
         }
 
         private static synchronized int handleDevId(ObjectInputStream in, ObjectOutputStream out, String user, int dev_id) throws IOException, ClassNotFoundException {
@@ -1278,6 +1238,10 @@ public class IoTServer {
 
         public synchronized LinkedList<String> getDevices() {
             return devices;
+        }
+
+        public synchronized void setDevices(LinkedList<String> newDevs) {
+            this.devices = newDevs;
         }
 
         public synchronized LinkedList<String> getUsers() {

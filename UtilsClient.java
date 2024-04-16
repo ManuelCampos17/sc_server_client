@@ -1,18 +1,26 @@
 import java.io.BufferedInputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.cert.Certificate;
+import java.util.Map;
 import java.util.Scanner;
 
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -259,6 +267,56 @@ public class UtilsClient {
         }
 
         return sk;
+    }
+
+    public static void genAndSendKey(Map<String, byte[]> saltsByDomain, Map<String, Integer> itersByDomain, String dom, String userId, String password, KeyStore tstore, SecureRandom rd, ObjectOutputStream out) {
+        try {
+            //Gerar key com password
+            boolean firstAdd = false;
+
+            byte[] salt = new byte[16];
+
+            if (saltsByDomain.containsKey(dom)) {
+                salt = saltsByDomain.get(dom);
+            }
+            else 
+            {
+                rd.nextBytes(salt);
+                saltsByDomain.put(dom, salt);
+                firstAdd = true;
+            }
+
+            int iter = rd.nextInt(1000) + 1;
+
+            if (itersByDomain.containsKey(dom)) {
+                iter = itersByDomain.get(dom);
+            }
+            else 
+            {
+                itersByDomain.put(dom, iter);
+            }
+
+            if (firstAdd) {
+                // Guardar salt e iter em file exclusivo para cliente
+                BufferedWriter wr = new BufferedWriter(new FileWriter("saltsAndIters_" + userId + ".txt", true));
+                wr.write(dom + ":" + salt + " " + iter + System.getProperty("line.separator"));
+                wr.close();
+            }
+
+            SecretKey domainKey = UtilsClient.generateDomainKey(password, salt, iter);
+
+            Certificate cert = tstore.getCertificate(userId.split("@")[0]);
+            PublicKey destUserPubKey = cert.getPublicKey();
+
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.WRAP_MODE, destUserPubKey);
+            byte[] dkSend = cipher.wrap(domainKey);
+
+            out.writeObject(dkSend);
+            out.flush();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
     }
     
 }
