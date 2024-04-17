@@ -11,11 +11,15 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
+import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.io.BufferedReader;
@@ -33,6 +37,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -146,6 +151,13 @@ public class IoTDevice {
 
             //Criar salts and iters file caso nao exista
             saltsAndIters = new File("saltsAndIters_" + userId + ".txt");
+
+            if (saltsAndIters.createNewFile()) {
+                System.out.println("Personal salts file created");
+            } else 
+            {
+                System.out.println("Personal salts file already exists.");
+            }
 
             //Ir buscar os salts e iters do file
             try {
@@ -297,12 +309,13 @@ public class IoTDevice {
                     out.writeObject(command);
                     out.flush();
                     String sourceFileName = parts[1];
-                    boolean retEi = ei(sourceFileName);
+                    srvResponse = (String) in.readObject();
+                    boolean retEi = ei(sourceFileName, userId, kstorepass);
 
                     if (!retEi) {
                         continue;
                     }
-                    srvResponse = (String) in.readObject();
+
                     System.out.println(srvResponse);
 
                 } else if (command.startsWith("RT")) { // print("OK" + " " + fileSize + " " + conteudo)
@@ -362,22 +375,53 @@ public class IoTDevice {
 
                 } else if (command.startsWith("RI")) { // print("OK" + " " + fileSize + " " + conteudo)
 
-                    if (parts.length != 2) {
-                        System.out.println("Invalid command");
-                        continue;
-                    } else {
-                        out.writeObject("RI" + " " + parts[1]);
-                        out.flush();
-                    }
-
-                    srvResponse = (String) in.readObject();
-
-                    String[] reqUser = parts[1].split(":");
-
-                    if (srvResponse.startsWith("OK")) {
-                        ri(reqUser[0], Integer.parseInt(reqUser[1]), in, out, kstorepass);
-                    }else{
-                        System.out.println(srvResponse);
+                    try {
+                        if (parts.length != 2) {
+                            System.out.println("Invalid command");
+                            continue;
+                        } else {
+                            out.writeObject("RI" + " " + parts[1]);
+                            out.flush();
+                        }
+    
+                        srvResponse = (String) in.readObject();
+    
+                        if (srvResponse.equals("OK")) {
+                            //Key
+                            byte[] recKey = (byte[]) in.readObject();
+                            Cipher dec = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                            PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
+                            dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
+                            SecretKey secretKey = (SecretKey) dec.unwrap(recKey, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
+    
+                            //Data
+                            byte[] recImg = (byte[]) in.readObject();
+                            byte[] params = (byte[]) in.readObject();
+    
+                            AlgorithmParameters p = AlgorithmParameters.getInstance("PBEWithHmacSHA256AndAES_128");
+                            p.init(params);
+    
+                            Cipher cipher = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                            cipher.init(Cipher.DECRYPT_MODE, secretKey, p);
+    
+                            // Descriptografar os dados
+                            byte[] decryptedImg = cipher.doFinal(recImg);
+    
+                            String[] reqUser = parts[1].split(":");
+    
+                            // Write received file data to the destination file
+                            FileOutputStream fileOutputStream = new FileOutputStream(reqUser[0] + "_" + reqUser[1] + "_received" + ".jpg");
+                            fileOutputStream.write(decryptedImg);
+                            fileOutputStream.close();
+    
+                            System.out.println(srvResponse);
+                        }
+                        else 
+                        {
+                            System.out.println(srvResponse);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
 
                 } else {
@@ -408,7 +452,7 @@ public class IoTDevice {
         return true;
     }
 
-    public static boolean ei(String sourceFileName){
+    public static boolean ei(String sourceFileName, String userId, char[] kstorepass){
         try (
              FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
 
@@ -428,11 +472,34 @@ public class IoTDevice {
             while (bytesRead < fileSize) {
                 bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
             }
-            // Write the file size to the output stream
-            out.writeInt(fileSize);
-            // Write the file data to the output stream
-            out.write(fileData);
-            out.flush(); // Ensure all data is sent
+
+            int myDomSize = (int) in.readObject();
+
+            LinkedList<SecretKey> recSKeys = new LinkedList<SecretKey>();
+
+            for (int i = 0; i < myDomSize; i++) {
+                byte[] secretKeyCiph = (byte[]) in.readObject();
+
+                Cipher dec = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
+                dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
+                SecretKey secretKey = (SecretKey) dec.unwrap(secretKeyCiph, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
+                recSKeys.add(secretKey);
+            }
+
+            for (int i = 0; i < recSKeys.size(); i++) {
+                Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+                c.init(Cipher.ENCRYPT_MODE, recSKeys.get(i));
+                byte[] ciphImg = c.doFinal(fileData);
+                byte[] params = c.getParameters().getEncoded();
+
+                out.writeObject(ciphImg);
+                out.flush();
+
+                out.writeObject(params);
+                out.flush();
+            }
+
             //close
             fileInputStream.close();
 
@@ -450,7 +517,7 @@ public class IoTDevice {
             }
 
             return false;
-        } catch (IOException e) {
+        } catch (Exception e) {
             System.out.println("An error occurred: " + e.getMessage());
             e.printStackTrace();
             return false;

@@ -60,6 +60,10 @@ public class IoTServer {
     private static volatile Map<String, byte[]> tempsByDomain = new HashMap<String, byte[]>();
     private static volatile Map<String, byte[]> tempsByDomainParams = new HashMap<String, byte[]>();
 
+    //Last device img
+    private static volatile Map<String, byte[]> imgsByDomain = new HashMap<String, byte[]>();
+    private static volatile Map<String, byte[]> imgsByDomainParams = new HashMap<String, byte[]>();
+
     //Usernames e passwords
     private static File userFile;
 
@@ -442,7 +446,7 @@ public class IoTServer {
                                 out.flush();
 
                                 byte[] cyDomainKey = (byte[]) in.readObject();
-                                domainKeys.put(reqSplit[2] + "_" + currUser, cyDomainKey);
+                                domainKeys.put(reqSplit[2], cyDomainKey);
 
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
@@ -526,7 +530,7 @@ public class IoTServer {
                                 out.flush();
 
                                 for (int i = 0; i < deviceDomains.size(); i++) {
-                                    out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
+                                    out.writeObject(domainKeys.get(deviceDomains.get(i)));
                                     out.flush();
                                 }
 
@@ -556,7 +560,7 @@ public class IoTServer {
 
                             break;
                         case "EI":
-                            ei(reqSplit[1], currUser, currDevId, in, out);
+                            ei(reqSplit[1], currUser, currDevId, in, out, currDevId);
                             break;
                         case "RT":
                             serverLock.lock();
@@ -592,7 +596,7 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
                                 
-                                out.writeObject(domainKeys.get(reqSplit[1] + "_" + currUser));
+                                out.writeObject(domainKeys.get(reqSplit[1]));
                                 out.flush();
 
                                 int resSize = 0;
@@ -637,7 +641,7 @@ public class IoTServer {
                             break;
                         case "RI":
                             String[] userDataRI = reqSplit[1].split(":");
-                            byte[] domKey = null;
+                            Domain chosenDom = null;
 
                             serverLock.lock();
                             try{
@@ -657,27 +661,15 @@ public class IoTServer {
                                     out.flush();
                                     break;
                                 }
-
-                                if (!new File(userDataRI[0] + "_" + userDataRI[1] + ".jpg").exists()) {
-                                    out.writeObject("NODATA # nao existem dados de imagem publicados");
-                                    out.flush();
-                                    break;
-                                }
                                 
                                 boolean hasPerms = false;
 
-                                if (reqSplit[1].equals(currUser + ":" + currDevId)) {
-                                    hasPerms = true;
-                                }
-                                else 
-                                {
-                                    for (Domain dom : domains) {
-                                        if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1])) {
-                                            //Check read perms
-                                            if (dom.getUsers().contains(currUser)) {
-                                                hasPerms = true;
-                                                domKey = domainKeys.get(dom.getName() + "_" + currUser);
-                                            }
+                                for (Domain dom : domains) {
+                                    if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1])) {
+                                        //Check read perms
+                                        if (dom.getUsers().contains(currUser)) {
+                                            chosenDom = dom;
+                                            hasPerms = true;
                                         }
                                     }
                                 }
@@ -696,9 +688,22 @@ public class IoTServer {
                             serverLock.lock();
 
                             try {
-                                ri(userDataRI[0] + "_" + userDataRI[1] + ".jpg", in, out);
+                                if (imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()) == null) {
+                                    out.writeObject("NODATA # nao existem dados de imagem publicados");
+                                    out.flush();
+                                    break;
+                                }
 
-                                out.writeObject(domKey);
+                                out.writeObject("OK");
+                                out.flush();
+
+                                out.writeObject(domainKeys.get(chosenDom.getName()));
+                                out.flush();
+                                
+                                out.writeObject(imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
+                                out.flush();
+
+                                out.writeObject(imgsByDomainParams.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
                                 out.flush();
                             } catch (Exception e) {
                                 System.out.println("An error occurred: " + e.getMessage());
@@ -1117,8 +1122,22 @@ public class IoTServer {
             }
         }
 
-        public synchronized void ei(String fileName, String name, int devid,ObjectInputStream in, ObjectOutputStream out){
-            String destinationFileName = name + "_" + devid + ".jpg";
+        public synchronized void ei(String fileName, String name, int devid, ObjectInputStream in, ObjectOutputStream out, int currDevId){
+            try {
+                if (fileName.endsWith(".jpg")) {
+                    System.out.println("File received from client and saved successfully.");
+    
+                    out.writeObject("OK");
+                    out.flush();
+                }
+                else 
+                {
+                    out.writeObject("NOK");
+                    out.flush();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
             String rec = null;
             try {
@@ -1133,43 +1152,25 @@ public class IoTServer {
                 return;
             }
 
-
             serverLock.lock();
             try {
-                // Receive file size from client
-                int fileSize = in.readInt();
+                LinkedList<String> deviceDomains = getDeviceDomains(currUser, currDevId);
     
-                // Create buffer to read file data
-                byte[] buffer = new byte[fileSize];
-                int totalBytesRead = 0;
-                int bytesRead;
-                while (totalBytesRead < fileSize && (bytesRead = in.read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
-                    totalBytesRead += bytesRead;
-                }
+                out.writeObject(deviceDomains.size());
+                out.flush();
     
-                if (totalBytesRead != fileSize) {
-                    throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
-                }
-                if (fileName.endsWith(".jpg")) {
-                    // Write received file data to the destination file
-                    FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
-                    fileOutputStream.write(buffer, 0, totalBytesRead);
-                    fileOutputStream.close();
-
-                    System.out.println("File received from client and saved successfully.");
-
-                    out.writeObject("OK");
+                for (int i = 0; i < deviceDomains.size(); i++) {
+                    out.writeObject(domainKeys.get(deviceDomains.get(i)));
                     out.flush();
                 }
-                else 
-                {
-                    out.writeObject("NOK");
-                    out.flush();
+    
+                for (int i = 0; i < deviceDomains.size(); i++) {
+                    byte[] ciphImg = (byte[]) in.readObject();
+                    byte[] paramsImg = (byte[]) in.readObject();
+                    imgsByDomain.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), ciphImg);
+                    imgsByDomainParams.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), paramsImg);
                 }
-
-                return;
-            } catch (IOException e) {
-                System.out.println("An error occurred: " + e.getMessage());
+            } catch (Exception e) {
                 e.printStackTrace();
             } finally {
                 serverLock.unlock();
