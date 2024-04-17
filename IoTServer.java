@@ -43,7 +43,7 @@ public class IoTServer {
 
     private static int port;
     private static String pass_cypher;
-    private static KeyPair sv_keys;
+    private static KeyStore sv_store;
     private static String pass_keystore;
     private static String apiKey;
 
@@ -81,6 +81,12 @@ public class IoTServer {
 
     private static volatile Map<String, byte[]> domainKeys = new HashMap<String, byte[]>();
 
+    private static byte[] sv_salt;
+    private static byte[] user_enc_params;
+    private static File sv_salt_file;
+
+    private static File last_params;
+ 
     public static void main(String[] args) {
         port = DEFAULT_PORT;
 
@@ -93,20 +99,82 @@ public class IoTServer {
         String keyStore = args[2];
 
         port = Integer.parseInt(args[0]);
+
         pass_cypher = args[1];
+
+        sv_salt_file = new File("txtFiles/svSalt.txt");
+        serverLock.lock();
+        try {
+            if (sv_salt_file.createNewFile()) {
+                SecureRandom random = new SecureRandom();
+                byte[] salt = new byte[8];
+                random.nextBytes(salt);
+
+                try (FileOutputStream fos = new FileOutputStream("txtFiles/svSalt.txt")) {
+                    fos.write(salt);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                
+                sv_salt = salt;
+            } else 
+            {
+                try (FileInputStream fis = new FileInputStream("txtFiles/svSalt.txt")) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024];
+                    int length;
+
+                    while ((length = fis.read(buffer)) != -1) {
+                        bos.write(buffer, 0, length);
+                    }
+
+                    sv_salt = bos.toByteArray();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            serverLock.unlock();
+        }
+
+        last_params = new File("txtFiles/lastParams.txt");
+        serverLock.lock();
+        try {
+            boolean existParams = last_params.createNewFile();
+            if (!existParams) {
+                try (FileInputStream fis = new FileInputStream("txtFiles/lastParams.txt")) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024];
+                    int length;
+
+                    while ((length = fis.read(buffer)) != -1) {
+                        bos.write(buffer, 0, length);
+                    }
+
+                    user_enc_params = bos.toByteArray();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            serverLock.unlock();
+        }
+
         pass_keystore = args[3];
 
         try {
             FileInputStream kStoreFile = new FileInputStream(args[2]);
-            KeyStore kstore = KeyStore.getInstance("JCEKS");
-            kstore.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
+            sv_store = KeyStore.getInstance("JCEKS");
+            sv_store.load(kStoreFile, pass_keystore.toCharArray());           //password para aceder à keystore
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         apiKey = args[4];
-
-
 
         //Criar size e nome do client executable caso nao exista
         serverLock.lock();
@@ -155,6 +223,7 @@ public class IoTServer {
             userFile = new File("txtFiles/users.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
+                user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
             } else {
                 System.out.println("Users file already exists.");
             }
@@ -166,6 +235,8 @@ public class IoTServer {
             } else {
                 System.out.println("Temps file already exists.");
             }
+
+            UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
 
             //Ir buscar as credentials que ja estao no file
             try {
@@ -182,6 +253,8 @@ public class IoTServer {
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
             }
+
+            user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
 
             //Ir buscar os dominios que ja estao no file
             try {
@@ -268,15 +341,12 @@ public class IoTServer {
                 serverLock.unlock();
             }
 
-
-
             // Começa aqui a comunicação com os clientes
             while (true){
                 SSLSocket cliSocket = (SSLSocket) srvSocket.accept();
                 ClientHandler ch = new ClientHandler(cliSocket);
                 new Thread(ch).start();
             }
-
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -810,9 +880,14 @@ public class IoTServer {
                             out.writeObject("checkedvalid");
                             out.flush();
 
+                            UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
+
                             BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("txtFiles/users.txt", true));
                             myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
                             myWriterUsers.close();
+
+                            user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
+
                             userCredentials.put(userId, splitEmail[0] + ".cer");
 
                             LinkedList<Integer> newUserDevIds = new LinkedList<>();
@@ -929,7 +1004,10 @@ public class IoTServer {
         }
 
         private static boolean verifyUser(String userId) {
+            UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
+            
             try {
+
                 BufferedReader rb = new BufferedReader(new FileReader("txtFiles/users.txt"));
                 String line = rb.readLine();
 
@@ -948,6 +1026,8 @@ public class IoTServer {
             } catch (Exception e) {
                 System.out.println("Erro: " + e);
             }
+
+            user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
 
             return false;
         }

@@ -2,8 +2,19 @@
 
 
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.AlgorithmParameters;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.Random;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.PBEParameterSpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -58,4 +69,67 @@ public class UtilsServer {
         return fiveDigits;
     }
 
+    public static byte[] encryptUsersFile(String filePath, String pass_cypher, byte[] salt) {
+        try {
+            // Ler o conteúdo do arquivo de usuários
+            byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+    
+            // Derivar a chave de cifração a partir da senha usando PBE
+            PBEKeySpec keySpec = new PBEKeySpec(pass_cypher.toCharArray(), salt, 1000, 128);
+            SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
+            SecretKey secretKey = keyFactory.generateSecret(keySpec);
+    
+            // Inicializar cifra
+            Cipher cipher = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+    
+            // Cifrar o conteúdo do arquivo
+            byte[] encryptedContent = cipher.doFinal(fileContent);
+    
+            // Escrever o conteúdo cifrado para um novo arquivo
+            try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+                outputStream.write(encryptedContent);
+            }
+
+            try (FileOutputStream fos = new FileOutputStream("txtFiles/lastParams.txt")) {
+                fos.write(cipher.getParameters().getEncoded());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            return cipher.getParameters().getEncoded();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static void decryptUsersFile(String filePath, String pass_cypher, byte[] salt, byte[] params) {
+        try {
+            // Ler o conteúdo do arquivo de usuários
+            byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+    
+            // Derivar a chave de cifração a partir da senha usando PBE
+            PBEKeySpec keySpec = new PBEKeySpec(pass_cypher.toCharArray(), salt, 1000, 128);
+            SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
+            SecretKey secretKey = keyFactory.generateSecret(keySpec);
+    
+            // Inicializar cifra
+            AlgorithmParameters p = AlgorithmParameters.getInstance("PBEWithHmacSHA256AndAES_128");
+            p.init(params);
+
+            Cipher cipher = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, p);
+    
+            // Decifrar o conteúdo do arquivo
+            byte[] decryptedContent = cipher.doFinal(fileContent);
+    
+            // Escrever o conteúdo cifrado para um novo arquivo
+            try (FileOutputStream outputStream = new FileOutputStream(filePath)) {
+                outputStream.write(decryptedContent);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
