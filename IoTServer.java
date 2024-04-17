@@ -697,7 +697,7 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
 
-                                out.writeObject(domainKeys.get(chosenDom.getName() + "_" + userDataRI[0]));
+                                out.writeObject(domainKeys.get(chosenDom.getName() + "_" + currUser));
                                 out.flush();
                                 
                                 out.writeObject(imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
