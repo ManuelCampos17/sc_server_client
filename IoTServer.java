@@ -446,7 +446,7 @@ public class IoTServer {
                                 out.flush();
 
                                 byte[] cyDomainKey = (byte[]) in.readObject();
-                                domainKeys.put(reqSplit[2], cyDomainKey);
+                                domainKeys.put(reqSplit[2] + "_" + reqSplit[1], cyDomainKey);
 
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
@@ -530,7 +530,7 @@ public class IoTServer {
                                 out.flush();
 
                                 for (int i = 0; i < deviceDomains.size(); i++) {
-                                    out.writeObject(domainKeys.get(deviceDomains.get(i)));
+                                    out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
                                     out.flush();
                                 }
 
@@ -596,7 +596,7 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
                                 
-                                out.writeObject(domainKeys.get(reqSplit[1]));
+                                out.writeObject(domainKeys.get(reqSplit[1] + "_" + currUser));
                                 out.flush();
 
                                 int resSize = 0;
@@ -697,7 +697,7 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
 
-                                out.writeObject(domainKeys.get(chosenDom.getName()));
+                                out.writeObject(domainKeys.get(chosenDom.getName() + "_" + userDataRI[0]));
                                 out.flush();
                                 
                                 out.writeObject(imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
@@ -1160,7 +1160,7 @@ public class IoTServer {
                 out.flush();
     
                 for (int i = 0; i < deviceDomains.size(); i++) {
-                    out.writeObject(domainKeys.get(deviceDomains.get(i)));
+                    out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
                     out.flush();
                 }
     

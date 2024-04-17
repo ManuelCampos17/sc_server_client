@@ -233,7 +233,7 @@ public class IoTDevice {
                             srvResponse = (String) in.readObject();
 
                             if (srvResponse.equals("OK")) {
-                                UtilsClient.genAndSendKey(saltsByDomain, itersByDomain, parts[2], userId, parts[3], tstore, rd, out);
+                                UtilsClient.genAndSendKey(saltsByDomain, itersByDomain, parts[2], parts[1], parts[3], tstore, rd, out);
                             }
                         } catch (Exception e) {
                             e.printStackTrace();
