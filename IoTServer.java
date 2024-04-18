@@ -812,6 +812,18 @@ public class IoTServer {
                             }
 
                             break;
+                        case "MYDOMAINS":
+                            LinkedList<String> deviceDomains = getDeviceDomains(currUser, currDevId);
+
+                            out.writeObject(deviceDomains.size());
+                            out.flush();
+
+                            if (deviceDomains.size() > 0) {
+                                for (String n : deviceDomains) {
+                                    out.writeObject(n);
+                                    out.flush();
+                                }
+                            }
                         default:     
                             out.writeObject("Pedido Invalido!");
                             out.flush();

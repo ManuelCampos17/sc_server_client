@@ -424,6 +424,27 @@ public class IoTDevice {
                         e.printStackTrace();
                     }
 
+                } else if (command.startsWith("MYDOMAINS")) {
+                    out.writeObject("MYDOMAINS");
+                    out.flush();
+
+                    StringBuilder sb = new StringBuilder();
+
+                    int domSize = (int) in.readObject();
+
+                    if (domSize == 0) {
+                        System.out.println("NO DOMAINS");
+                    }
+                    else 
+                    {
+                        for (int i = 0; i < domSize; i++) {
+                            String domName = (String) in.readObject();
+                            sb.append(domName + System.getProperty("line.separator"));
+                        }
+    
+                        System.out.println(sb.toString());
+                    }
+
                 } else {
                     System.out.println("Invalid command");
                 }
