@@ -96,8 +96,8 @@ public class UtilsServer {
 
             try (FileOutputStream fos = new FileOutputStream("txtFiles/lastParams.txt")) {
                 fos.write(params);
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Exception e2) {
+                e2.printStackTrace();
             }
 
             return params;

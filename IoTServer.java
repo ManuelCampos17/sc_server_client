@@ -256,7 +256,8 @@ public class IoTServer {
 
                 rb.close();
             } catch (Exception e) {
-                System.out.println("Erro: " + e);
+                System.out.println("Erro (Search credentials): " + e);
+                e.printStackTrace();
             }
 
             user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
@@ -276,8 +277,10 @@ public class IoTServer {
                         if (domType[1].equals("(Devices)")) {
                             LinkedList<String> devices = new LinkedList<String>();
 
-                            for (String dev : dom[1].split(" ")) {
-                                devices.add(dev);
+                            if (dom.length == 2) {
+                                for (String dev : dom[1].split(" ")) {
+                                    devices.add(dev);
+                                }
                             }
 
                             devicesListByDomain.put(domType[0], devices);
@@ -303,8 +306,10 @@ public class IoTServer {
                     if (domType[1].equals("(Users)")) {
                         LinkedList<String> usersSplit = new LinkedList<String>();
 
-                        for (String us : dom[1].split(" ")) {
-                            usersSplit.add(us);
+                        if (dom.length == 2) {
+                            for (String us : dom[1].split(" ")) {
+                                usersSplit.add(us);
+                            }
                         }
 
                         usersListByDomain.put(domType[0], usersSplit);
@@ -317,12 +322,30 @@ public class IoTServer {
                 usersListByDomain.remove(" ");
                 rbUsers.close();
 
+                Map<String, String> domainCreators = new HashMap<String, String>();
+                BufferedReader rbCreators = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
+                String lineCreators = rbCreators.readLine();
+
+                while (lineCreators != null){
+                    String[] dom = lineCreators.split(":");
+                    String[] domType = dom[0].split(" ");
+
+                    if (domType[1].equals("(CREATOR)")) {
+                        domainCreators.put(domType[0], dom[1]);
+                    }
+
+                    lineCreators = rbCreators.readLine();
+                }
+
+                rbCreators.close();
+
                 for (String dom : domainsList) {
-                    Domain currDom = new Domain(dom, usersListByDomain.get(dom).get(0), devicesListByDomain.get(dom), usersListByDomain.get(dom));
+                    Domain currDom = new Domain(dom, domainCreators.get(dom), devicesListByDomain.get(dom), usersListByDomain.get(dom));
                     domains.add(currDom);
                 }
             } catch (Exception e) {
-                System.out.println("Erro: " + e);
+                System.out.println("Erro (Search domains): " + e);
+                e.printStackTrace();
             } finally {
                 serverLock.unlock();
             }
@@ -341,7 +364,7 @@ public class IoTServer {
 
                 rb.close();
             } catch (Exception e) {
-                System.out.println("Erro: " + e);
+                System.out.println("Erro (Search temps): " + e);
             } finally {
                 serverLock.unlock();
             }
@@ -428,6 +451,7 @@ public class IoTServer {
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Users):" + System.getProperty("line.separator"));
                                     myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
+                                    myWriterDomainsCR.write(reqSplit[1] + " (CREATOR):" + currUser + System.getProperty("line.separator"));
                                     myWriterDomainsCR.close();
 
                                     out.writeObject("OK");
@@ -510,7 +534,7 @@ public class IoTServer {
                                     out.flush();
                                     break;
                                 }
-                                
+
                                 if (selectedDomADD.getUsers().contains(reqSplit[1])) {
                                     out.writeObject("NOK # o user ja se encontra no dominio");
                                     out.flush();
@@ -1021,6 +1045,7 @@ public class IoTServer {
 
                     if (splitLine[0].equals(userId)) {
                         rb.close();
+                        user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
                         return true;
                     }
 
@@ -1029,7 +1054,7 @@ public class IoTServer {
 
                 rb.close();
             } catch (Exception e) {
-                System.out.println("Erro: " + e);
+                System.out.println("Erro (Verify User): " + e);
             }
 
             user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
@@ -1197,6 +1222,8 @@ public class IoTServer {
                     {
                         myWriterDomains.write(d.getName() + " (Devices):" + System.getProperty("line.separator"));
                     }
+
+                    myWriterDomains.write(d.getName() + " (CREATOR):" + d.getCreator() + System.getProperty("line.separator"));
                 }
     
                 myWriterDomains.close();
