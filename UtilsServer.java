@@ -1,6 +1,7 @@
 // Classe para colocar funções úteis que podem ser usadas em várias partes do código
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.file.Files;
@@ -91,13 +92,15 @@ public class UtilsServer {
                 outputStream.write(encryptedContent);
             }
 
+            byte[] params = cipher.getParameters().getEncoded();
+
             try (FileOutputStream fos = new FileOutputStream("txtFiles/lastParams.txt")) {
-                fos.write(cipher.getParameters().getEncoded());
+                fos.write(params);
             } catch (Exception e) {
                 e.printStackTrace();
             }
 
-            return cipher.getParameters().getEncoded();
+            return params;
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -106,8 +109,20 @@ public class UtilsServer {
 
     public static void decryptUsersFile(String filePath, String pass_cypher, byte[] salt, byte[] params) {
         try {
-            // Ler o conteúdo do arquivo de usuários
-            byte[] fileContent = Files.readAllBytes(Paths.get(filePath));
+            byte[] fileContent = null;
+            try (FileInputStream fis = new FileInputStream("txtFiles/users.txt")) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                int length;
+
+                while ((length = fis.read(buffer)) != -1) {
+                    bos.write(buffer, 0, length);
+                }
+
+                fileContent = bos.toByteArray();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
     
             // Derivar a chave de cifração a partir da senha usando PBE
             PBEKeySpec keySpec = new PBEKeySpec(pass_cypher.toCharArray(), salt, 1000, 128);

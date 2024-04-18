@@ -7,6 +7,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.MessageDigest;
@@ -133,7 +135,7 @@ public class IoTServer {
                     e.printStackTrace();
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             serverLock.unlock();
@@ -142,6 +144,7 @@ public class IoTServer {
         last_params = new File("txtFiles/lastParams.txt");
         serverLock.lock();
         try {
+
             boolean existParams = last_params.createNewFile();
             if (!existParams) {
                 try (FileInputStream fis = new FileInputStream("txtFiles/lastParams.txt")) {
@@ -158,7 +161,8 @@ public class IoTServer {
                     e.printStackTrace();
                 }
             }
-        } catch (IOException e) {
+
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             serverLock.unlock();
@@ -223,7 +227,6 @@ public class IoTServer {
             userFile = new File("txtFiles/users.txt");
             if (userFile.createNewFile()) {
                 System.out.println("Users file created");
-                user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
             } else {
                 System.out.println("Users file already exists.");
             }
@@ -236,7 +239,9 @@ public class IoTServer {
                 System.out.println("Temps file already exists.");
             }
 
-            UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
+            if (user_enc_params != null) {
+                UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
+            }
 
             //Ir buscar as credentials que ja estao no file
             try {
@@ -1005,7 +1010,7 @@ public class IoTServer {
 
         private static boolean verifyUser(String userId) {
             UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
-            
+
             try {
 
                 BufferedReader rb = new BufferedReader(new FileReader("txtFiles/users.txt"));
