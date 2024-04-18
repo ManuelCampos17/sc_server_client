@@ -824,6 +824,8 @@ public class IoTServer {
                                     out.flush();
                                 }
                             }
+
+                            break;
                         default:     
                             out.writeObject("Pedido Invalido!");
                             out.flush();
