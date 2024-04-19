@@ -4,18 +4,26 @@
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AlgorithmParameters;
+import java.security.InvalidKeyException;
 import java.security.KeyStore;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Random;
 
 import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.PBEParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
@@ -146,5 +154,36 @@ public class UtilsServer {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static byte[] calculateHMAC(String filePath, String pass_cypher, byte[] salt) throws NoSuchAlgorithmException, InvalidKeyException, IOException, InvalidKeySpecException {
+        byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
+
+        // Derivar a chave de cifração a partir da senha usando PBE
+        PBEKeySpec keySpec = new PBEKeySpec(pass_cypher.toCharArray(), salt, 1000, 128);
+        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
+        SecretKey secretKey = keyFactory.generateSecret(keySpec);
+
+        Mac mac = Mac.getInstance("HmacSHA1");
+        mac.init(secretKey);
+        mac.update(fileBytes);
+
+        byte[] ret = mac.doFinal();
+
+        if (filePath.equals("txtFiles/clientProgram.txt")) {
+            // Escrever o conteúdo cifrado para um novo arquivo
+            try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
+                outputStream.write(ret);
+            }
+        }
+        else
+        {
+            // Escrever o conteúdo cifrado para um novo arquivo
+            try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                outputStream.write(ret);
+            }
+        }
+
+        return ret;
     }
 }

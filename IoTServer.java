@@ -79,9 +79,13 @@ public class IoTServer {
 
     //App name e size
     private static File clientProgramData;
+    private static byte[] progDataHMAC;
+    private static File progDataHMACFile;
 
     //Ficheiro usado para ter persistencia dos dominios e o seu estado
     private static File domainsInfo;
+    private static byte[] domainsHMAC;
+    private static File domainsHMACFile;
 
     //Ficheiro usado para ter persistencia das ultimas temperaturas enviadas
     private static File tempsFile;
@@ -202,6 +206,60 @@ public class IoTServer {
 
         apiKey = args[4];
 
+        serverLock.lock();
+        //Criar file com info do HMAC do domainsInfo caso nao exista
+        domainsHMACFile = new File("txtFiles/domainsInfoHMAC.txt");
+        try {
+            boolean created = domainsHMACFile.createNewFile();
+            
+            if (!created) {
+                try (FileInputStream fis = new FileInputStream("txtFiles/domainsInfoHMAC.txt")) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024];
+                    int length;
+
+                    while ((length = fis.read(buffer)) != -1) {
+                        bos.write(buffer, 0, length);
+                    }
+
+                    domainsHMAC = bos.toByteArray();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            serverLock.unlock();
+        }
+
+        serverLock.lock();
+        //Criar file com info do HMAC do clientProgramData caso nao exista
+        progDataHMACFile = new File("txtFiles/progDataHMAC.txt");
+        try {
+            boolean created = progDataHMACFile.createNewFile();
+            
+            if (!created) {
+                try (FileInputStream fis = new FileInputStream("txtFiles/progDataHMAC.txt")) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[1024];
+                    int length;
+
+                    while ((length = fis.read(buffer)) != -1) {
+                        bos.write(buffer, 0, length);
+                    }
+
+                    progDataHMAC = bos.toByteArray();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            serverLock.unlock();
+        }
+
         //Criar size e nome do client executable caso nao exista
         serverLock.lock();
         clientProgramData = new File("txtFiles/clientProgram.txt");
@@ -213,11 +271,18 @@ public class IoTServer {
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("txtFiles/clientProgram.txt", true));
                 myWriterClient.write("IoTDeviceCopy.class");
                 myWriterClient.close();
+
+                progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
             } else 
             {
                 System.out.println("Client file data already exists.");
+
+                if (UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt) != progDataHMAC) {
+                    System.out.println("Executable tampered with.");
+                    System.exit(-1);
+                }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             serverLock.unlock();
@@ -229,11 +294,17 @@ public class IoTServer {
         try {
             if (domainsInfo.createNewFile()) {
                 System.out.println("Domains file created");
+                domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
             } else 
             {
                 System.out.println("Domains file already exists.");
+
+                if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
+                    System.out.println("Domains file tampered with.");
+                    System.exit(-1);
+                }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             serverLock.unlock();
@@ -284,8 +355,13 @@ public class IoTServer {
 
             user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
 
+            
             //Ir buscar os dominios que ja estao no file
             try {
+                if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
+                    System.out.println("Domains file tampered with.");
+                    System.exit(-1);
+                }
 
                 //Filtrar as linhas de devices e acrescentar a um mapa de devices por domain
                 BufferedReader rbDevices = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
@@ -374,6 +450,8 @@ public class IoTServer {
                     Domain currDom = new Domain(dom, domainCreators.get(dom), devicesListByDomain.get(dom), usersListByDomain.get(dom));
                     domains.add(currDom);
                 }
+
+                domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
             } catch (Exception e) {
                 System.out.println("Erro (Search domains): " + e);
                 e.printStackTrace();
@@ -482,9 +560,17 @@ public class IoTServer {
 
                 //Handle file
                 byte[] exeTest = (byte[]) in.readObject();
-                boolean fileCheck = handleFile(in, out,nonce, exeTest);
+                int fileCheck = handleFile(in, out, nonce, exeTest);
 
-                if (!fileCheck) {
+                if (fileCheck == -1) {
+                    out.close();
+                    in.close();
+                    clientSocket.close();
+                    System.out.println("Tampered program data file, disconnecting...");
+                    return;
+                }
+
+                if (fileCheck == 0) {
                     out.close();
                     in.close();
                     clientSocket.close();
@@ -506,6 +592,11 @@ public class IoTServer {
                                 domains.add(newDomain);
 
                                 try {
+                                    if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
+                                        System.out.println("Domains file tampered with.");
+                                        System.exit(-1);
+                                    }
+
                                     //Escrever no domains file
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
 
@@ -519,6 +610,8 @@ public class IoTServer {
                                     myWriterDomainsCR.write(reqSplit[1] + " (CREATOR):" + currUser + System.getProperty("line.separator"));
 
                                     myWriterDomainsCR.close();
+
+                                    domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
 
                                     out.writeObject("OK");
                                     out.flush();
@@ -550,6 +643,11 @@ public class IoTServer {
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
                                 domains.add(newDomain);
 
+                                if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
+                                    System.out.println("Domains file tampered with.");
+                                    System.exit(-1);
+                                }
+
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
 
@@ -557,6 +655,8 @@ public class IoTServer {
                                 myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.write(reqSplit[1] + " (CREATOR):" + currUser + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
+
+                                domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
 
                                 out.writeObject("OK");
                                 out.flush();
@@ -1282,11 +1382,15 @@ public class IoTServer {
             return dev_id;
         }
 
-        private static synchronized boolean handleFile(ObjectInputStream in, ObjectOutputStream out, byte [] nonce, byte[] exeTest) {
-            boolean retval = false;
+        private static synchronized int handleFile(ObjectInputStream in, ObjectOutputStream out, byte [] nonce, byte[] exeTest) {
+            int retval = 0;
 
             serverLock.lock();
             try {
+                if (UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt) != progDataHMAC) {
+                    return -1;
+                }
+
                 BufferedReader progInfoReader = new BufferedReader(new FileReader("txtFiles/clientProgram.txt"));
                 String flName = progInfoReader.readLine();
 
@@ -1312,16 +1416,17 @@ public class IoTServer {
                 if ( Arrays.equals(hash, exeTest) ) {
                     out.writeObject("OK-TESTED");
                     out.flush();
-                    retval = true;
+                    retval = 1;
                 }
                 else 
                 {
                     out.writeObject("NOK-TESTED");
                     out.flush();
-                    retval = false;
+                    retval = 0;
                 }
 
                 progInfoReader.close();
+                progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -1335,6 +1440,11 @@ public class IoTServer {
         private synchronized static void updateDomainsFile() throws IOException {
             serverLock.lock();
             try{
+                if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
+                    System.out.println("Domains file tampered with.");
+                    System.exit(-1);
+                }
+
                 domainsInfo.delete();
                 domainsInfo = new File("txtFiles/domainsInfo.txt");
     
@@ -1369,7 +1479,9 @@ public class IoTServer {
                 }
     
                 myWriterDomains.close();
-            } catch (IOException e) {
+
+                domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+            } catch (Exception e) {
                 e.printStackTrace();
             } finally {
                 serverLock.unlock();
