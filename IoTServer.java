@@ -44,18 +44,26 @@ public class IoTServer {
     private static Lock serverLock = new ReentrantLock();
 
     private static int port;
+
+    // Password a ser usada para gerar a chave simetrica que cifra os ficheiros da aplicacao
     private static String pass_cypher;
+
+    //Par de chaves do server
     private static KeyStore sv_store;
+
+    //Password da sv_store
     private static String pass_keystore;
+
+    //Api-key grupo15
     private static String apiKey;
 
-    //User -> Password
+    // Username : Certificado com chave publica
     private static volatile Map<String, String> userCredentials = new HashMap<>();
     
-    //Nome do domain -> Tipo que ainda vou definir (maybe lista de users q la tao)
+    //Lista de domains do servidor
     private static volatile LinkedList<Domain> domains = new LinkedList<Domain>();
 
-    //Dev-id connected
+    //Dev-id connected - dispositivos que estao connected de momento ao server
     private static volatile Map<String, LinkedList<Integer>> connected = new HashMap<String, LinkedList<Integer>>();
 
     //Last device temp
@@ -66,30 +74,38 @@ public class IoTServer {
     private static volatile Map<String, byte[]> imgsByDomain = new HashMap<String, byte[]>();
     private static volatile Map<String, byte[]> imgsByDomainParams = new HashMap<String, byte[]>();
 
-    //Usernames e passwords
+    //Ficheiro usado para ter persistencia de dados de login de users
     private static File userFile;
 
     //App name e size
     private static File clientProgramData;
 
-    //Domain file
+    //Ficheiro usado para ter persistencia dos dominios e o seu estado
     private static File domainsInfo;
 
-    //Temps
+    //Ficheiro usado para ter persistencia das ultimas temperaturas enviadas
     private static File tempsFile;
 
     //Registered devices history
     private static File regHist;
 
+    //Chaves de dominio no formato key -> <domainName_user> : value -> <chave cifrada em byte[]>
     private static volatile Map<String, byte[]> domainKeys = new HashMap<String, byte[]>();
 
+    //Salt usado no encrypt e decrypt do users file
     private static byte[] sv_salt;
+
+    //Params usados no decrypt do users file com o PBEWithHmacSHA256AndAES_128
     private static byte[] user_enc_params;
+
+    //Ficheiro usado para ter persistencia do salt usado no encrypt e decrypt do users
     private static File sv_salt_file;
 
+    //Ficheiro usado para ter persistencia dos ultimos params usados no encrypt do users
     private static File last_params;
  
     public static void main(String[] args) {
+        //No caso de nao dar porta nos args
         port = DEFAULT_PORT;
 
         if (args.length != 5) {
@@ -104,6 +120,9 @@ public class IoTServer {
 
         pass_cypher = args[1];
 
+        //Verificar se ja existe um salt para ser usado no encrypt e decrypt do users.txt
+        //Não existe -> Gerar o salt e registar no file
+        //Existe -> Ir buscar ao file e associar a variavel global
         sv_salt_file = new File("txtFiles/svSalt.txt");
         serverLock.lock();
         try {
@@ -141,6 +160,8 @@ public class IoTServer {
             serverLock.unlock();
         }
 
+        //Verificar se ja houve alguma encriptacao do users.txt
+        //Se ja houve -> Ir buscar esses parametros e associar a variavel global user_enc_params
         last_params = new File("txtFiles/lastParams.txt");
         serverLock.lock();
         try {
@@ -170,6 +191,7 @@ public class IoTServer {
 
         pass_keystore = args[3];
 
+        //Load do objeto keystore do server com os dados do file
         try {
             FileInputStream kStoreFile = new FileInputStream(args[2]);
             sv_store = KeyStore.getInstance("JCEKS");
@@ -202,7 +224,7 @@ public class IoTServer {
         }
 
         serverLock.lock();
-        //Criar file com info dos domains caso nao exista (vazio por agora)
+        //Criar file com info dos domains caso nao exista
         domainsInfo = new File("txtFiles/domainsInfo.txt");
         try {
             if (domainsInfo.createNewFile()) {
@@ -264,6 +286,8 @@ public class IoTServer {
 
             //Ir buscar os dominios que ja estao no file
             try {
+
+                //Filtrar as linhas de devices e acrescentar a um mapa de devices por domain
                 BufferedReader rbDevices = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
                 String lineDevices = rbDevices.readLine();
                 Map<String, LinkedList<String>> devicesListByDomain = new HashMap<String, LinkedList<String>>();
@@ -291,10 +315,14 @@ public class IoTServer {
                 }
 
                 rbDevices.close();
+
+                //Tem sempre um espaço a mais -> remover
                 devicesListByDomain.remove(" ");
 
+                //Registar os nomes dos diferentes domains
                 LinkedList<String> domainsList = new LinkedList<String>();
 
+                //Filtrar as linhas de users e acrescentar a um mapa de users por domain
                 BufferedReader rbUsers = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
                 String lineUsers = rbUsers.readLine();
                 Map<String, LinkedList<String>> usersListByDomain = new HashMap<String, LinkedList<String>>();
@@ -319,9 +347,11 @@ public class IoTServer {
                     lineUsers = rbUsers.readLine();
                 }
 
+                //Tem sempre um espaço a mais -> remover
                 usersListByDomain.remove(" ");
                 rbUsers.close();
 
+                //Filtrar as linhas que indicam o creator do domain e registar tambem num mapa
                 Map<String, String> domainCreators = new HashMap<String, String>();
                 BufferedReader rbCreators = new BufferedReader(new FileReader("txtFiles/domainsInfo.txt"));
                 String lineCreators = rbCreators.readLine();
@@ -339,6 +369,7 @@ public class IoTServer {
 
                 rbCreators.close();
 
+                //Construir os domains que ja existiam por persistencia com a listas organizadas acima, e adicionar a lista de domains do server
                 for (String dom : domainsList) {
                     Domain currDom = new Domain(dom, domainCreators.get(dom), devicesListByDomain.get(dom), usersListByDomain.get(dom));
                     domains.add(currDom);
@@ -365,6 +396,34 @@ public class IoTServer {
                 rb.close();
             } catch (Exception e) {
                 System.out.println("Erro (Search temps): " + e);
+                e.printStackTrace();
+            } finally {
+                serverLock.unlock();
+            }
+
+            serverLock.lock();
+            //Ir buscar chaves de domain que ja existiam
+            try {
+                File domKeysFolder = new File("domKeys");
+
+                for (File fileEntry : domKeysFolder.listFiles()) {
+                    try (FileInputStream fis = new FileInputStream("domKeys/" + fileEntry.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+    
+                        domainKeys.put(fileEntry.getName().replace(".txt", ""), bos.toByteArray());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Erro (Get dom keys): " + e);
+                e.printStackTrace();
             } finally {
                 serverLock.unlock();
             }
@@ -384,7 +443,7 @@ public class IoTServer {
     static class ClientHandler implements Runnable {
         private SSLSocket clientSocket;
 
-        //Para remover do connected
+        //Para remover do connected em caso de desconexao
         private String currUser;
 
         public ClientHandler(SSLSocket clientSocket) {
@@ -401,7 +460,7 @@ public class IoTServer {
 
                 authOperations(in, out);
 
-                //Handle Auth Dev-id (Later)
+                //Handle Auth Dev-id
                 int dev_id = (int) in.readObject();
                 int currDevId = handleDevId(in, out, currUser, dev_id);
 
@@ -446,12 +505,19 @@ public class IoTServer {
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
                                 domains.add(newDomain);
 
-                                try{
+                                try {
                                     //Escrever no domains file
                                     BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
+
+                                    //Lista de users
                                     myWriterDomainsCR.write(reqSplit[1] + " (Users):" + System.getProperty("line.separator"));
+
+                                    //Lista de devices
                                     myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
+
+                                    //Criador
                                     myWriterDomainsCR.write(reqSplit[1] + " (CREATOR):" + currUser + System.getProperty("line.separator"));
+
                                     myWriterDomainsCR.close();
 
                                     out.writeObject("OK");
@@ -465,6 +531,7 @@ public class IoTServer {
                                 break;
                             }
                             
+                            //Verificar se o domain ja existe
                             boolean found = false;
                             for (Domain dom : domains) {
                                 if (dom.getName().equals(reqSplit[1])) {
@@ -479,14 +546,16 @@ public class IoTServer {
                             
                             serverLock.lock();
 
-                            try{
+                            try {
                                 Domain newDomain = new Domain(reqSplit[1], currUser);
                                 domains.add(newDomain);
+
                                 //Escrever no domains file
                                 BufferedWriter myWriterDomainsCR = new BufferedWriter(new FileWriter("txtFiles/domainsInfo.txt", true));
-                                //O primeiro user é o creator
+
                                 myWriterDomainsCR.write(reqSplit[1] + " (Users):" + System.getProperty("line.separator"));
                                 myWriterDomainsCR.write(reqSplit[1] + " (Devices):" + System.getProperty("line.separator"));
+                                myWriterDomainsCR.write(reqSplit[1] + " (CREATOR):" + currUser + System.getProperty("line.separator"));
                                 myWriterDomainsCR.close();
 
                                 out.writeObject("OK");
@@ -544,8 +613,19 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
 
+                                //Receber a chave cifrada do user que se deu add para o domain e registar no mapa
                                 byte[] cyDomainKey = (byte[]) in.readObject();
                                 domainKeys.put(reqSplit[2] + "_" + reqSplit[1], cyDomainKey);
+
+                                //Registar a nova key num file para persistencia
+                                File newKeyFile = new File("domKeys/" + reqSplit[2] + "_" + reqSplit[1] + ".txt");
+                                newKeyFile.createNewFile();
+
+                                try (FileOutputStream fos = new FileOutputStream("domKeys/" + reqSplit[2] + "_" + reqSplit[1] + ".txt")) {
+                                    fos.write(cyDomainKey);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
 
                                 domains.remove(selectedDomADD);
                                 selectedDomADD.addUser(reqSplit[1]);
@@ -566,6 +646,7 @@ public class IoTServer {
                                 Domain selectedDomRD = null;
                                 boolean exists = false;
 
+                                //Verificar se o domain existe
                                 for (Domain dom : domains) {
                                     if (dom.getName().equals(reqSplit[1])) {
                                         exists = true;
@@ -579,24 +660,28 @@ public class IoTServer {
                                     break;
                                 }
 
+                                //Verificar se o user esta no domain
                                 if (!selectedDomRD.getUsers().contains(currUser)) {
                                     out.writeObject("NOPERM # sem permissoes");
                                     out.flush();
                                     break;
                                 }
 
+                                //Remover para modificar
                                 domains.remove(selectedDomRD);
 
+                                //Criar a lista com o novo device no caso de ainda nao existir, adicionar o device caso exista
                                 if (selectedDomRD.getDevices() == null) {
                                     LinkedList<String> addDevs = new LinkedList<String>();
                                     addDevs.add(currUser + "_" + currDevId);
                                     selectedDomRD.setDevices(addDevs);
                                 }
                                 else 
-                                {
+                                {   
                                     selectedDomRD.addDevice(currUser + "_" + currDevId);
                                 }
 
+                                //Voltar a dar add do domain e dar update no txt
                                 domains.add(selectedDomRD);
                                 
                                 updateDomainsFile();
@@ -610,6 +695,7 @@ public class IoTServer {
                             }
                             break;
                         case "ET":
+                            //Verificar se a temp e um valor de float valido ("BANANA" nao daria nao e)
                             try {
                                 Float.parseFloat(reqSplit[1]);
                             } catch(NumberFormatException e) {
@@ -628,11 +714,13 @@ public class IoTServer {
                                 out.writeObject(deviceDomains.size());
                                 out.flush();
 
+                                //Enviar as keys do user de todos os seus domains
                                 for (int i = 0; i < deviceDomains.size(); i++) {
                                     out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
                                     out.flush();
                                 }
 
+                                //Registar as temps recebidas por domain, bem como os params para decrypt
                                 for (int i = 0; i < deviceDomains.size(); i++) {
                                     byte[] ciphTemp = (byte[]) in.readObject();
                                     byte[] paramsTemp = (byte[]) in.readObject();
@@ -667,9 +755,9 @@ public class IoTServer {
                                 Domain rtDomain = null;
 
                                 for (Domain dom : domains) {
-                                    
+                                    //Ir buscar o domain
                                     if (dom.getName().equals(reqSplit[1])) {
-                                        //Check read perms
+                                        //Check read perms (se o user esta no domain)
                                         if (!dom.getUsers().contains(currUser)) {
                                             out.writeObject("NOPERM # sem permissoes de leitura");
                                             out.flush();
@@ -695,11 +783,13 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
                                 
+                                //Enviar a key do user correspondente ao domain
                                 out.writeObject(domainKeys.get(reqSplit[1] + "_" + currUser));
                                 out.flush();
 
                                 int resSize = 0;
 
+                                //Enviar o tamanho para o for loop do client
                                 for (Map.Entry<String, byte[]> entry : tempsByDomain.entrySet()) {
                                     String key = entry.getKey();
                                     String[] splitKey = key.split("_");
@@ -713,9 +803,13 @@ public class IoTServer {
                                 out.writeObject(resSize);
                                 out.flush();
 
+                                //Enviar as temps cifradas e os params para decrypt
                                 for (Map.Entry<String, byte[]> entry : tempsByDomain.entrySet()) {
                                     String key = entry.getKey();
+
+                                    //0 -> Username ; 1 -> DevId ; 2 -> DomainName
                                     String[] splitKey = key.split("_");
+
                                     String entUser = splitKey[0] + "_" + splitKey[1];
                                     String entDom = splitKey[2];
 
@@ -739,11 +833,15 @@ public class IoTServer {
                             }
                             break;
                         case "RI":
+                            //O 0 e o username e o 1 o device id
                             String[] userDataRI = reqSplit[1].split(":");
+
                             Domain chosenDom = null;
+                            LinkedList<Domain> possibleDoms = new LinkedList<Domain>();
 
                             serverLock.lock();
                             try{
+                                //Verificar se o dispositivo existe na base de dados
                                 BufferedReader regReader = new BufferedReader(new FileReader("txtFiles/registeredDevices.txt"));
                                 String regReaderLine = regReader.readLine();
                                 LinkedList<String> devs = new LinkedList<String>();
@@ -761,13 +859,15 @@ public class IoTServer {
                                     break;
                                 }
                                 
+                                //Verificar se o currentUser esta num dominio que contem o device
                                 boolean hasPerms = false;
 
                                 for (Domain dom : domains) {
-                                    if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1])) {
+                                    if (dom.getDevices().contains(userDataRI[0] + "_" + userDataRI[1]) && !hasPerms) {
                                         //Check read perms
                                         if (dom.getUsers().contains(currUser)) {
-                                            chosenDom = dom;
+                                            //Guardar os domains que satisfacam as condicoes
+                                            possibleDoms.add(dom);
                                             hasPerms = true;
                                         }
                                     }
@@ -787,7 +887,14 @@ public class IoTServer {
                             serverLock.lock();
 
                             try {
-                                if (imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()) == null) {
+                                for (Domain d : possibleDoms) {
+                                    if (imgsByDomain.containsKey(userDataRI[0] + "_" + userDataRI[1] + "_" + d.getName())) {
+                                        chosenDom = d;
+                                    }
+                                }
+
+                                //Verificar se o user ja enviou a imagem para algum dos domains possiveis
+                                if (chosenDom == null) {
                                     out.writeObject("NODATA # nao existem dados de imagem publicados");
                                     out.flush();
                                     break;
@@ -796,16 +903,18 @@ public class IoTServer {
                                 out.writeObject("OK");
                                 out.flush();
 
+                                //Enviar a chave do user correspondente ao domain
                                 out.writeObject(domainKeys.get(chosenDom.getName() + "_" + currUser));
                                 out.flush();
                                 
+                                //Enviar a imagem cifrada
                                 out.writeObject(imgsByDomain.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
                                 out.flush();
 
+                                //Enviar os params de decrypt
                                 out.writeObject(imgsByDomainParams.get(userDataRI[0] + "_" + userDataRI[1] + "_" + chosenDom.getName()));
                                 out.flush();
                             } catch (Exception e) {
-                                System.out.println("An error occurred: " + e.getMessage());
                                 e.printStackTrace();
                             } finally {
                                 serverLock.unlock();
@@ -818,6 +927,7 @@ public class IoTServer {
                             out.writeObject(deviceDomains.size());
                             out.flush();
 
+                            //Enviar a lista de domains 1 por 1
                             if (deviceDomains.size() > 0) {
                                 for (String n : deviceDomains) {
                                     out.writeObject(n);
@@ -832,8 +942,9 @@ public class IoTServer {
                     }
                 }
             } catch (SocketException e) {
-                System.out.println(("Client disconnected: " + e.getMessage()));
+                System.out.println(("Client \"" + currUser + "\" disconnected"));
                 
+                //Em caso de desconexao, remover o device da lista de devices conectados
                 serverLock.lock();
                 try{
                     if (connected.containsKey(currUser)) {
@@ -848,6 +959,7 @@ public class IoTServer {
             }
         }
 
+        //Retornar os domains em que o device esta presente (RD)
         private LinkedList<String> getDeviceDomains(String user, int devid) {
             LinkedList<String> ret = new LinkedList<String>();
 
@@ -879,12 +991,14 @@ public class IoTServer {
 
                         byte[] signedNonce = (byte[]) in.readObject();
 
+                        //Ir buscar a publicKey do user ao seu certificado
                         FileInputStream fis = new FileInputStream(userId.split("@")[0] + ".cer");
                         CertificateFactory cf = CertificateFactory.getInstance("X509");
                         Certificate cert = cf.generateCertificate(fis);
                         PublicKey userPubKey = cert.getPublicKey();
                         fis.close();
 
+                        //Verificar a assinatura do nonce
                         Signature s = Signature.getInstance("MD5withRSA");
                         s.initVerify(userPubKey);
                         s.update(nonce);
@@ -914,17 +1028,20 @@ public class IoTServer {
                         fos.write(certBytes);
                         fos.close();
 
+                        //Verificar a assinatura com a chave publica enviada
                         Signature s = Signature.getInstance("MD5withRSA");
                         s.initVerify(recPubKey);
                         s.update(recNonce);
                         boolean verifySig = s.verify(recSignature);
 
+                        //Verificar se o nonce e o mesmo criado pelo server e se assinatura foi verificada com sucesso
                         if (Arrays.equals(recNonce, nonce) && verifySig) {
                             out.writeObject("checkedvalid");
                             out.flush();
 
                             UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
 
+                            //Registar o user no users.txt
                             BufferedWriter myWriterUsers = new BufferedWriter(new FileWriter("txtFiles/users.txt", true));
                             myWriterUsers.write(userId + ":" + splitEmail[0] + ".cer" + System.getProperty("line.separator"));
                             myWriterUsers.close();
@@ -947,21 +1064,25 @@ public class IoTServer {
                     e.printStackTrace();
                 }
 
+                //O user utilizado nas operacoes
                 currUser = userId;
 
                 //4.2.2
                 String C2FA = UtilsServer.generateC2FA();
 
+                //Emails pre definidos pelo grupo como users validos
                 if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
                     out.writeObject("yes");
                     out.flush();
 
+                    //Enviar o email ao user escolhido
                     sendEmail(userId, C2FA, apiKey);
                 }
                 else 
                 {
                     boolean correctEmail = false;
 
+                    //Verificar se o email enviado e valido
                     while (!correctEmail) {
                         out.writeObject("no");
                         out.flush();
@@ -981,12 +1102,14 @@ public class IoTServer {
 
                 String recCode = (String) in.readObject();
 
+                //Verificar se o codigo introduzido esta correto
                 if (!recCode.equals(C2FA)) {
                     out.writeObject("C2FA code incorrect.");
                     out.flush();
 
                     String userTryAgain = (String) in.readObject();
 
+                    //Se nao, voltar ao inicio da two-factor auth
                     if (userTryAgain.equals("tryagain")) {
                         authOperations(in, out);
                     }
@@ -1002,20 +1125,20 @@ public class IoTServer {
         }
 
         private void sendEmail(String userId, String C2FA, String apiKey) {
-            // Monta a URL com os parâmetros fornecidos
+            //Montar URL para get
             String url = "https://lmpinto.eu.pythonanywhere.com/2FA?e=" + userId + "&c=" + C2FA + "&a=" + apiKey;
 
             try {
-                // Cria um objeto URL a partir da string da URL
+                //Objeto url
                 URL requestUrl = new URI(url).toURL();
                 
-                // Abre a conexão HTTP
+                //Abrir HTTP
                 HttpURLConnection connection = (HttpURLConnection) requestUrl.openConnection();
                 
-                // Define o método HTTP como GET
+                //Definir como get
                 connection.setRequestMethod("GET");
                 
-                // Lê a resposta da API
+                //Para ler a resposta da API
                 BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                 StringBuilder response = new StringBuilder();
 
@@ -1026,19 +1149,20 @@ public class IoTServer {
 
                 reader.close();
                 
-                // Imprime a resposta da API
+                //Imprimir a resposta para verificacao na consola do server
                 System.out.println("Response from API: " + response.toString());
 
-                // Fecha a conexão
+                //Desligar a connection
                 connection.disconnect();
                 
-                // Espera 5 segundos entre as chamadas (conforme requisito da API)
+                //Esperar 5 secs -> Enunciado
                 TimeUnit.SECONDS.sleep(5);
-            } catch (IOException | InterruptedException | URISyntaxException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
 
+        //Gerar random nonce -> byte[]
         private static byte[] generateNonce() throws NoSuchAlgorithmException {
             SecureRandom secureRandom = SecureRandom.getInstanceStrong();
             byte[] nonce = new byte[8];
@@ -1046,6 +1170,7 @@ public class IoTServer {
             return nonce;
         }
 
+        //Verificar se o user existe na "base de dados" (txt file)
         private static boolean verifyUser(String userId) {
             UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
 
@@ -1069,6 +1194,7 @@ public class IoTServer {
                 rb.close();
             } catch (Exception e) {
                 System.out.println("Erro (Verify User): " + e);
+                e.printStackTrace();
             }
 
             user_enc_params = UtilsServer.encryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt);
@@ -1084,6 +1210,7 @@ public class IoTServer {
                 return -1;
             }
 
+            //Se o user ja tem dispositivos conectados, adicionar, se nao, adicionar ao map
             if (connected.containsKey(user)) {
                 LinkedList<Integer> appendUserDevId = connected.get(user);
                 appendUserDevId.add(dev_id);
@@ -1204,6 +1331,7 @@ public class IoTServer {
             return retval;
         }
 
+        //Adicionar novos domains ao file (Users, Devices, Creator)
         private synchronized static void updateDomainsFile() throws IOException {
             serverLock.lock();
             try{
@@ -1250,6 +1378,7 @@ public class IoTServer {
 
         public synchronized void ei(String fileName, String name, int devid, ObjectInputStream in, ObjectOutputStream out, int currDevId){
             try {
+                //Verificar se a foto e JPG
                 if (fileName.endsWith(".jpg")) {
                     System.out.println("File received from client and saved successfully.");
     
@@ -1265,6 +1394,7 @@ public class IoTServer {
                 e.printStackTrace();
             }
 
+            //Verificar se a foto foi encontrada no lado do client, se nao, abortar
             String rec = null;
             try {
                 rec = (String) in.readObject();
@@ -1278,21 +1408,28 @@ public class IoTServer {
                 return;
             }
 
+            //Guardar a imagem cifrada no map
             serverLock.lock();
             try {
+                //Procurar os domains em que o device esta presente
                 LinkedList<String> deviceDomains = getDeviceDomains(currUser, currDevId);
-    
+                
+                //Enviar o size para for loop
                 out.writeObject(deviceDomains.size());
                 out.flush();
-    
+                
+                //Enviar as keys correspondentes ao user de cada um dos seus domains
                 for (int i = 0; i < deviceDomains.size(); i++) {
                     out.writeObject(domainKeys.get(deviceDomains.get(i) + "_" + currUser));
                     out.flush();
                 }
-    
+                
+                //Receber a imagem cifrada para cada um dos seus domains, e os parametros da cifra para depois decifrar
                 for (int i = 0; i < deviceDomains.size(); i++) {
                     byte[] ciphImg = (byte[]) in.readObject();
                     byte[] paramsImg = (byte[]) in.readObject();
+
+                    //Formato da key -> username_devId_domainName
                     imgsByDomain.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), ciphImg);
                     imgsByDomainParams.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), paramsImg);
                 }
@@ -1310,21 +1447,23 @@ public class IoTServer {
                 out.writeObject("OK");
                 out.flush();
     
-                // Get the file size
+                //Tamanho do file
                 File file = new File(sourceFileName);
                 int fileSize = (int) file.length();
                 byte[] fileData = new byte[fileSize];
-                // Read the entire file into memory
+
+                //Ler o ficheiro em memoria
                 int bytesRead = 0;
                 while (bytesRead < fileSize) {
                     bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
                 }
-                // Write the file size to the output stream
+
+
+                //Enviar o size e o conteudo
                 out.writeInt(fileSize);
-                // Write the file data to the output stream
                 out.write(fileData);
-                out.flush(); // Ensure all data is sent
-                //close
+                out.flush();
+
                 fileInputStream.close();
     
                 System.out.println("File sent to client successfully.");
@@ -1335,12 +1474,21 @@ public class IoTServer {
         }
     }
 
+    //Custom class para domains
     private static class Domain {
+        //Nome
         private String name;
+
+        //Nome do user que criou
         private String creator;
+
+        //Lista de devices pertencentes
         private LinkedList<String> devices;
+
+        //Lista de users pertencentes
         private LinkedList<String> users;
 
+        //Construtor basico
         public Domain(String name, String creator) {
             this.name = name;
             this.creator = creator;
@@ -1348,6 +1496,7 @@ public class IoTServer {
             this.users = new LinkedList<String>();
         }
 
+        //Construtor completo
         public Domain(String name, String creator, LinkedList<String> devs, LinkedList<String> users) {
             this.name = name;
             this.creator = creator;
