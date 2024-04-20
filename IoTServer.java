@@ -156,8 +156,8 @@ public class IoTServer {
         last_params = new File("txtFiles/lastParams.txt");
         serverLock.lock();
         try {
-
             boolean existParams = last_params.createNewFile();
+
             if (!existParams) {
                 try (FileInputStream fis = new FileInputStream("txtFiles/lastParams.txt")) {
                     ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -290,6 +290,7 @@ public class IoTServer {
                 System.out.println("Domains file created");
 
                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+                
                 // Escrever o conteúdo cifrado para um novo arquivo
                 try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
                     outputStream.write(domainsHMAC);
