@@ -540,6 +540,7 @@ public class IoTServer {
 
         //Para remover do connected em caso de desconexao
         private String currUser;
+        private int currUserDevId;
 
         public ClientHandler(SSLSocket clientSocket) {
             this.clientSocket = clientSocket;
@@ -568,6 +569,8 @@ public class IoTServer {
                     System.out.println();
                     return;
                 }
+
+                currUserDevId = currDevId;
 
                 // adicionar o nonce como verificação para o cliente
                 byte[] nonce = generateNonce();
@@ -1069,13 +1072,22 @@ public class IoTServer {
                     }
                 }
             } catch (SocketException e) {
-                System.out.println(("Client \"" + currUser + "\" disconnected"));
+                System.out.println(("Client \"" + currUser + "_" + currUserDevId + "\" disconnected"));
                 
-                //Em caso de desconexao, remover o device da lista de devices conectados
+                //Em caso de desconexao, remover o device da lista de devices conectados do user
                 serverLock.lock();
                 try{
+                    LinkedList<Integer> removeDevId = new LinkedList<Integer>();
+                    LinkedList<Integer> userDevIds = connected.get(currUser);
+
+                    for (int d : userDevIds) {
+                        if (d != currUserDevId) {
+                            removeDevId.add(d);
+                        }
+                    }
+
                     if (connected.containsKey(currUser)) {
-                        connected.remove(currUser);
+                        connected.put(currUser, removeDevId);
                     }
                 } finally {
                     serverLock.unlock();
