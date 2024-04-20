@@ -166,7 +166,7 @@ public class UtilsServer {
         SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWithHmacSHA256AndAES_128");
         SecretKey secretKey = keyFactory.generateSecret(keySpec);
 
-        Mac mac = Mac.getInstance("HmacSHA1");
+        Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(secretKey);
         mac.update(fileContent);
 
