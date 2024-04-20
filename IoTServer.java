@@ -274,6 +274,11 @@ public class IoTServer {
 
                 if (new File("IoTDeviceCopy.class").exists()) {
                     progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+
+                    // Escrever o conteúdo cifrado para um novo arquivo
+                    try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
+                        outputStream.write(progDataHMAC);
+                    }
                 }
             } else 
             {
@@ -296,8 +301,12 @@ public class IoTServer {
         try {
             if (domainsInfo.createNewFile()) {
                 System.out.println("Domains file created");
+
                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
-                System.out.println(domainsHMAC);
+                // Escrever o conteúdo cifrado para um novo arquivo
+                try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                    outputStream.write(domainsHMAC);
+                }
             } else 
             {
                 System.out.println("Domains file already exists.");
@@ -362,7 +371,7 @@ public class IoTServer {
             //Ir buscar os dominios que ja estao no file
             try {
                 byte[] test = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
-                System.out.println(test);
+
                 if (test != domainsHMAC) {
                     System.out.println("Domains file tampered with2.");
                     System.exit(-1);
@@ -457,6 +466,11 @@ public class IoTServer {
                 }
 
                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+
+                // Escrever o conteúdo cifrado para um novo arquivo
+                try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                    outputStream.write(domainsHMAC);
+                }
             } catch (Exception e) {
                 System.out.println("Erro (Search domains): " + e);
                 e.printStackTrace();
@@ -618,6 +632,11 @@ public class IoTServer {
 
                                     domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
 
+                                    // Escrever o conteúdo cifrado para um novo arquivo
+                                    try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                                        outputStream.write(domainsHMAC);
+                                    }
+
                                     out.writeObject("OK");
                                     out.flush();
                                 } catch (IOException e) {
@@ -662,6 +681,11 @@ public class IoTServer {
                                 myWriterDomainsCR.close();
 
                                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+
+                                // Escrever o conteúdo cifrado para um novo arquivo
+                                try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                                    outputStream.write(domainsHMAC);
+                                }
 
                                 out.writeObject("OK");
                                 out.flush();
@@ -1431,7 +1455,13 @@ public class IoTServer {
                 }
 
                 progInfoReader.close();
+
                 progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+
+                // Escrever o conteúdo cifrado para um novo arquivo
+                try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
+                    outputStream.write(progDataHMAC);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -1486,6 +1516,11 @@ public class IoTServer {
                 myWriterDomains.close();
 
                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+
+                // Escrever o conteúdo cifrado para um novo arquivo
+                try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
+                    outputStream.write(domainsHMAC);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {

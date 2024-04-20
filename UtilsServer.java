@@ -170,22 +170,6 @@ public class UtilsServer {
         mac.init(secretKey);
         mac.update(fileContent);
 
-        byte[] ret = mac.doFinal();
-
-        if (filePath.equals("txtFiles/clientProgram.txt")) {
-            // Escrever o conteúdo cifrado para um novo arquivo
-            try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
-                outputStream.write(ret);
-            }
-        }
-        else
-        {
-            // Escrever o conteúdo cifrado para um novo arquivo
-            try (FileOutputStream outputStream = new FileOutputStream("txtFiles/domainsInfoHMAC.txt")) {
-                outputStream.write(ret);
-            }
-        }
-
-        return ret;
+        return mac.doFinal();
     }
 }
