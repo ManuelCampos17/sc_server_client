@@ -272,7 +272,9 @@ public class IoTServer {
                 myWriterClient.write("IoTDeviceCopy.class");
                 myWriterClient.close();
 
-                progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+                if (new File("IoTDeviceCopy.class").exists()) {
+                    progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+                }
             } else 
             {
                 System.out.println("Client file data already exists.");
@@ -295,12 +297,13 @@ public class IoTServer {
             if (domainsInfo.createNewFile()) {
                 System.out.println("Domains file created");
                 domainsHMAC = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+                System.out.println(domainsHMAC);
             } else 
             {
                 System.out.println("Domains file already exists.");
 
                 if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
-                    System.out.println("Domains file tampered with.");
+                    System.out.println("Domains file tampered with1.");
                     System.exit(-1);
                 }
             }
@@ -358,8 +361,10 @@ public class IoTServer {
             
             //Ir buscar os dominios que ja estao no file
             try {
-                if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
-                    System.out.println("Domains file tampered with.");
+                byte[] test = UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt);
+                System.out.println(test);
+                if (test != domainsHMAC) {
+                    System.out.println("Domains file tampered with2.");
                     System.exit(-1);
                 }
 
@@ -593,7 +598,7 @@ public class IoTServer {
 
                                 try {
                                     if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
-                                        System.out.println("Domains file tampered with.");
+                                        System.out.println("Domains file tampered with3.");
                                         System.exit(-1);
                                     }
 
@@ -644,7 +649,7 @@ public class IoTServer {
                                 domains.add(newDomain);
 
                                 if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
-                                    System.out.println("Domains file tampered with.");
+                                    System.out.println("Domains file tampered with4.");
                                     System.exit(-1);
                                 }
 
@@ -1441,7 +1446,7 @@ public class IoTServer {
             serverLock.lock();
             try{
                 if (UtilsServer.calculateHMAC("txtFiles/domainsInfo.txt", pass_cypher, sv_salt) != domainsHMAC) {
-                    System.out.println("Domains file tampered with.");
+                    System.out.println("Domains file tampered with5.");
                     System.exit(-1);
                 }
 

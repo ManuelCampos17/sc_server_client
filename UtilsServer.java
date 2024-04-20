@@ -157,7 +157,9 @@ public class UtilsServer {
     }
 
     public static byte[] calculateHMAC(String filePath, String pass_cypher, byte[] salt) throws NoSuchAlgorithmException, InvalidKeyException, IOException, InvalidKeySpecException {
-        byte[] fileBytes = Files.readAllBytes(Paths.get(filePath));
+        FileInputStream fis = new FileInputStream(filePath);
+        byte[] fileContent = fis.readAllBytes();
+        fis.close();
 
         // Derivar a chave de cifração a partir da senha usando PBE
         PBEKeySpec keySpec = new PBEKeySpec(pass_cypher.toCharArray(), salt, 1000, 128);
@@ -166,7 +168,7 @@ public class UtilsServer {
 
         Mac mac = Mac.getInstance("HmacSHA1");
         mac.init(secretKey);
-        mac.update(fileBytes);
+        mac.update(fileContent);
 
         byte[] ret = mac.doFinal();
 
