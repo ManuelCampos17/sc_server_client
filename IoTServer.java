@@ -87,9 +87,6 @@ public class IoTServer {
     private static byte[] domainsHMAC;
     private static File domainsHMACFile;
 
-    //Ficheiro usado para ter persistencia das ultimas temperaturas enviadas
-    private static File tempsFile;
-
     //Registered devices history
     private static File regHist;
 
@@ -334,17 +331,6 @@ public class IoTServer {
                 System.out.println("Users file created");
             } else {
                 System.out.println("Users file already exists.");
-            }
-            
-            //Criar temps file caso nao exista
-            tempsFile = new File("txtFiles/tempsFile.txt");
-            if (tempsFile.createNewFile()) {
-                System.out.println("Temps file created");
-            } else {
-                System.out.println("Temps file already exists.");
-            }
-
-            if (user_enc_params != null) {
                 UtilsServer.decryptUsersFile("txtFiles/users.txt", pass_cypher, sv_salt, user_enc_params);
             }
 
@@ -479,18 +465,106 @@ public class IoTServer {
             serverLock.lock();
             //Ir buscar as temps que ja estao no file
             try {
-                BufferedReader rb = new BufferedReader(new FileReader("txtFiles/tempsFile.txt"));
-                String line = rb.readLine();
+                File tempsFolder = new File("tempFiles");
 
-                while (line != null){
-                    String[] userTemp = line.split(":");
-                    tempsByDomain.put(userTemp[0], userTemp[1].getBytes(StandardCharsets.UTF_8));
-                    line = rb.readLine();
+                for (File fileEntry : tempsFolder.listFiles()) {
+                    try (FileInputStream fis = new FileInputStream("tempFiles/" + fileEntry.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+    
+                        tempsByDomain.put(fileEntry.getName().replace(".txt", ""), bos.toByteArray());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-
-                rb.close();
             } catch (Exception e) {
-                System.out.println("Erro (Search temps): " + e);
+                System.out.println("Erro (Get temps): " + e);
+                e.printStackTrace();
+            } finally {
+                serverLock.unlock();
+            }
+
+            serverLock.lock();
+            //Ir buscar as temp params que ja estao no file
+            try {
+                File tempsParamsFolder = new File("tempParams");
+
+                for (File fileEntry : tempsParamsFolder.listFiles()) {
+                    try (FileInputStream fis = new FileInputStream("tempParams/" + fileEntry.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+    
+                        tempsByDomainParams.put(fileEntry.getName().replace(".txt", ""), bos.toByteArray());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Erro (Get temp params): " + e);
+                e.printStackTrace();
+            } finally {
+                serverLock.unlock();
+            }
+
+            serverLock.lock();
+            //Ir buscar as imgs que ja estao no file
+            try {
+                File imgsFolder = new File("imgFiles");
+
+                for (File fileEntry : imgsFolder.listFiles()) {
+                    try (FileInputStream fis = new FileInputStream("imgFiles/" + fileEntry.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+    
+                        imgsByDomain.put(fileEntry.getName().replace(".txt", ""), bos.toByteArray());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Erro (Get imgs): " + e);
+                e.printStackTrace();
+            } finally {
+                serverLock.unlock();
+            }
+
+            serverLock.lock();
+            //Ir buscar as img params que ja estao no file
+            try {
+                File imgParamsFolder = new File("imgParams");
+
+                for (File fileEntry : imgParamsFolder.listFiles()) {
+                    try (FileInputStream fis = new FileInputStream("imgParams/" + fileEntry.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+    
+                        imgsByDomainParams.put(fileEntry.getName().replace(".txt", ""), bos.toByteArray());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Erro (Get img params): " + e);
                 e.printStackTrace();
             } finally {
                 serverLock.unlock();
@@ -856,19 +930,26 @@ public class IoTServer {
                                     byte[] paramsTemp = (byte[]) in.readObject();
                                     tempsByDomain.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), ciphTemp);
                                     tempsByDomainParams.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), paramsTemp);
+
+                                    //Persistencia de temp e param
+                                    File newTempFile = new File("tempFiles/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt");
+                                    newTempFile.createNewFile();
+
+                                    try (FileOutputStream fos = new FileOutputStream("tempFiles/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt")) {
+                                        fos.write(ciphTemp);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+
+                                    File newTempParam = new File("tempParams/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt");
+                                    newTempParam.createNewFile();
+
+                                    try (FileOutputStream fos = new FileOutputStream("tempParams/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt")) {
+                                        fos.write(paramsTemp);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
                                 }
-
-                                //Write no temps file
-                                tempsFile.delete();
-                                tempsFile = new File("txtFiles/tempsFile.txt");
-
-                                BufferedWriter etFileWriter = new BufferedWriter(new FileWriter(tempsFile, true));
-
-                                for (Map.Entry<String, byte[]> set : tempsByDomain.entrySet()) {
-                                    etFileWriter.write(set.getKey() + ":" + set.getValue() + System.getProperty("line.separator"));
-                                }
-
-                                etFileWriter.close();
                             } catch (IOException e) {
                                 e.printStackTrace();
                             } finally {
@@ -984,7 +1065,7 @@ public class IoTServer {
                                 regReader.close();
 
                                 if (!devs.contains(reqSplit[1])) {
-                                    out.writeObject("NOID # esse device id não existe");
+                                    out.writeObject("NOID # esse device id nao existe");
                                     out.flush();
                                     break;
                                 }
@@ -1594,6 +1675,25 @@ public class IoTServer {
                     //Formato da key -> username_devId_domainName
                     imgsByDomain.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), ciphImg);
                     imgsByDomainParams.put(currUser + "_" + currDevId + "_" + deviceDomains.get(i), paramsImg);
+
+                    //Persistencia de imgs e param
+                    File newImgFile = new File("imgFiles/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt");
+                    newImgFile.createNewFile();
+
+                    try (FileOutputStream fos = new FileOutputStream("imgFiles/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt")) {
+                        fos.write(ciphImg);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    File newImgParam = new File("imgParams/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt");
+                    newImgParam.createNewFile();
+
+                    try (FileOutputStream fos = new FileOutputStream("imgParams/" + currUser + "_" + currDevId + "_" + deviceDomains.get(i) + ".txt")) {
+                        fos.write(paramsImg);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             } catch (Exception e) {
                 e.printStackTrace();
