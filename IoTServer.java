@@ -1,15 +1,10 @@
+//Grupo 15: Tiago Almeida (58161), Manuel Campos (58166), Tiago Rocha (58242)
+
 import java.io.*;
 import java.net.HttpURLConnection;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.SocketException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -24,14 +19,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLServerSocket;
-import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
-
 import java.util.LinkedList;
 
 // IoTServer [port]
@@ -106,6 +95,7 @@ public class IoTServer {
     private static File last_params;
  
     public static void main(String[] args) {
+
         //No caso de nao dar porta nos args
         port = DEFAULT_PORT;
 
@@ -610,6 +600,7 @@ public class IoTServer {
     }
 
     static class ClientHandler implements Runnable {
+        
         private SSLSocket clientSocket;
 
         //Para remover do connected em caso de desconexao
@@ -1520,7 +1511,7 @@ public class IoTServer {
                 FileInputStream fis = new FileInputStream(f);
                 BufferedInputStream bis = new BufferedInputStream(fis);
                 byte[] bytesBuffer = new byte[flSize];
-                long bytesRd = bis.read(bytesBuffer, 0, bytesBuffer.length);
+                bis.read(bytesBuffer, 0, bytesBuffer.length);
 
                 // Concatenar o nonce o conteudo do ficheiro
                 byte[] concatNonceFl = new byte[nonce.length + bytesBuffer.length];

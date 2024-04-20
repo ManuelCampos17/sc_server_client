@@ -1,48 +1,33 @@
+//Grupo 15: Tiago Almeida (58161), Manuel Campos (58166), Tiago Rocha (58242)
+
 // <serverAddress> identifica o servidor. O formato de serverAddress é o seguinte:
 // <IP/hostname>[:Port]. O endereço IP/hostname do servidor é obrigatório e o
 // porto é opcional. Por omissão, o cliente deve ligar-se ao porto 12345 do servidor.
-// • <dev-id> - número inteiro que identifica o dispositivo.
-// • <user-id> - string que identifica o (endereço de email do) utilizador local.
+// <dev-id> - número inteiro que identifica o dispositivo.
+// <user-id> - string que identifica o (endereço de email do) utilizador local.
 
 // IoTDevice <serverAddress> <truststore> <keystore> <passwordkeystore> <dev-id> <user-id>
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
-import java.security.InvalidKeyException;
-import java.security.Key;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Scanner;
-
 import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.PBEParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLSocket;
 
 // --------------------------------- //
@@ -67,7 +52,7 @@ public class IoTDevice {
     private static Map<String, byte[]> saltsByDomain = new HashMap<String, byte[]>();
     private static Map<String, Integer> itersByDomain = new HashMap<String, Integer>();
 
-    private static File saltsAndIters;
+    private static File itersFile;
 
     public static void main(String[] args) {
         try {
@@ -107,13 +92,12 @@ public class IoTDevice {
 
             //Setup do TLS/SSL
             String trustStore = args[1];
-            String trustStorePassword = args[3]; // Mudar, para já é igual à password da keystore
+            String trustStorePassword = args[3];
 
             clientSocket = UtilsClient.initializeClient(trustStore, trustStorePassword, serverAddress, port);
             clientSocket.startHandshake();
 
             // Inicializar os streams
-
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
 
@@ -124,7 +108,7 @@ public class IoTDevice {
                 return;
             }
 
-            // Enviar o devId (NAO VAI SER AQUI, VAI SER MUDADO DE SITIO DEPOIS)
+            // Enviar o devId
             out.writeObject(devId);
             out.flush();
 
@@ -149,42 +133,60 @@ public class IoTDevice {
                 System.out.println("File tested");
             }
 
-            //Criar salts and iters file caso nao exista
-            saltsAndIters = new File("saltsAndIters_" + userId + ".txt");
+            //Criar iters file caso nao exista
+            itersFile = new File("iters_" + userId + ".txt");
 
-            if (saltsAndIters.createNewFile()) {
-                System.out.println("Personal salts file created");
+            if (itersFile.createNewFile()) {
+                System.out.println("Personal iters file created");
             } else 
             {
-                System.out.println("Personal salts file already exists.");
+                System.out.println("Personal iters file already exists.");
             }
 
-            //Ir buscar os salts e iters do file
-            try {
-                BufferedReader rb = new BufferedReader(new FileReader("saltsAndIters_" + userId + ".txt"));
-                String line = rb.readLine();
+            //Repopular iters map do user, se ja nao for a primeira conexao do cliente
+            File itersFile = new File("iters_" + userId + ".txt");
+            if (itersFile.exists()) {
+                BufferedReader reader = new BufferedReader(new FileReader("iters_" + userId + ".txt"));
+                String iterLine = reader.readLine();
 
-                while (line != null){
-                    String[] splitLine = line.split(":");
-                    String dom = splitLine[0];
-                    String params = splitLine[1];
+                while (iterLine != null){
+                    String[] splitLine = iterLine.split(":");
 
-                    byte[] getSalt = (params.split(" ")[0]).getBytes();
-                    int getIter = Integer.parseInt(params.split(" ")[1]);
+                    itersByDomain.put(splitLine[0], Integer.parseInt(splitLine[1]));
 
-                    saltsByDomain.put(dom, getSalt);
-                    itersByDomain.put(dom, getIter);
-
-                    line = rb.readLine();
+                    iterLine = reader.readLine();
                 }
 
-                rb.close();
-            } catch (Exception e) {
-                System.out.println("Erro: " + e);
+                reader.close();
+            }
+
+            //Repopular salts map do user, se ja nao for a primeira conexao do cliente
+            File directory = new File(".");
+            File[] files = directory.listFiles();
+
+            //Ver quais sao ficheiros de salt e repopular
+            for (File file : files) {
+                if (file.isFile() && file.getName().startsWith("salt_")) {
+                    try (FileInputStream fis = new FileInputStream(file.getName())) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        byte[] buffer = new byte[1024];
+                        int length;
+    
+                        while ((length = fis.read(buffer)) != -1) {
+                            bos.write(buffer, 0, length);
+                        }
+                        
+                        String fileName = file.getName().replace(".txt", "");
+                        saltsByDomain.put(fileName.split("_")[2], bos.toByteArray());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
 
             System.out.println();
             System.out.println();
+
             // Mostrar menu de opções
             System.out.println("Menu de Opções:");
             System.out.println("CREATE <dm> # Criar domínio - utilizador é Owner");
@@ -192,10 +194,8 @@ public class IoTDevice {
             System.out.println("RD <dm> # Registar o Dispositivo atual no domínio <dm>");
             System.out.println("ET <float> # Enviar valor <float> de Temperatura para o servidor.");
             System.out.println("EI <filename.jpg> # Enviar Imagem <filename.jpg> para o servidor.");
-            System.out.println(
-                    "RT <dm> # Receber as últimas medições de Temperatura de cada dispositivo do domínio <dm>, desde que o utilizador tenha permissões.");
-            System.out.println(
-                    "RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
+            System.out.println("RT <dm> # Receber as últimas medições de Temperatura de cada dispositivo do domínio <dm>, desde que o utilizador tenha permissões.");
+            System.out.println("RI <user-id>:<dev_id> # Receber o ficheiro Imagem do dispositivo <userid>:<dev_id> do servidor, desde que o utilizador tenha permissões.");
 
             System.out.println();
 
@@ -210,7 +210,9 @@ public class IoTDevice {
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
-                    } else {
+                    } 
+                    else 
+                    {
                         String domainName = parts[1];
 
                         out.writeObject("CREATE " + domainName);
@@ -225,7 +227,9 @@ public class IoTDevice {
                     if (parts.length != 4) {
                         System.out.println("Invalid command");
                         continue;
-                    } else {
+                    } 
+                    else 
+                    {
                         out.writeObject("ADD " + parts[1] + " " + parts[2] + " ");
                         out.flush();
 
@@ -248,22 +252,28 @@ public class IoTDevice {
                         if (parts.length != 2) {
                             System.out.println("Invalid command");
                             continue;
-                        } else {
+                        } 
+                        else 
+                        {
                             String domainName = parts[1];
                             out.writeObject("RD" + " " + domainName);
                             out.flush();
                         }
+
                         srvResponse = (String) in.readObject();
                         System.out.println(srvResponse);
                     } catch(Exception e) {
                         e.printStackTrace();
                     }
+
                 } else if (command.startsWith("ET")) {
 
                     if (parts.length != 2) {
                         System.out.println("Invalid command");
                         continue;
-                    } else {
+                    } 
+                    else 
+                    {
                         try {
                             out.writeObject("ET" + " " + parts[1]);
                             out.flush();
@@ -271,20 +281,28 @@ public class IoTDevice {
                             srvResponse = (String) in.readObject();
 
                             if (srvResponse.equals("OK")) {
+                                //Receber o tamanho da lista de dominios a que pertence
                                 int myDomSize = (int) in.readObject();
 
+                                //Guardar as suas keys de dominio
                                 LinkedList<SecretKey> recSKeys = new LinkedList<SecretKey>();
 
                                 for (int i = 0; i < myDomSize; i++) {
                                     byte[] secretKeyCiph = (byte[]) in.readObject();
 
+                                    //Dar unwrap da key com a propria private key
                                     Cipher dec = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+
+                                    //Get da private key pela key store pessoal
                                     PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
+
+                                    //Unwrap da key
                                     dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
                                     SecretKey secretKey = (SecretKey) dec.unwrap(secretKeyCiph, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
                                     recSKeys.add(secretKey);
                                 }
 
+                                //Utilizar cada key de dominio para enviar a temperatura cifrada para cada domain ao server, bem como os parametros usados no encrypt para depois dar decrypt
                                 for (int i = 0; i < recSKeys.size(); i++) {
                                     Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
                                     c.init(Cipher.ENCRYPT_MODE, recSKeys.get(i));
@@ -318,7 +336,7 @@ public class IoTDevice {
 
                     System.out.println(srvResponse);
 
-                } else if (command.startsWith("RT")) { // print("OK" + " " + fileSize + " " + conteudo)
+                } else if (command.startsWith("RT")) {
 
                     try {
                         if (parts.length != 2) {
@@ -334,12 +352,14 @@ public class IoTDevice {
                         if (srvResponse.equals("OK")) {
                             //Key
                             byte[] recKey = (byte[]) in.readObject();
+
+                            //Unwrap da key cifrada recebida
                             Cipher dec = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                             PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
                             dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
                             SecretKey secretKey = (SecretKey) dec.unwrap(recKey, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
     
-                            //Data
+                            //Decrypt da informacao recebida (cada temp de cada user do domain) com a domain key
                             StringBuilder rtSb = new StringBuilder();
                             rtSb.append(parts[1] + ": ");
                             int recSize = (int) in.readObject();
@@ -349,14 +369,14 @@ public class IoTDevice {
                                 byte[] recTemp = (byte[]) in.readObject();
                                 byte[] params = (byte[]) in.readObject();
                                 
-
+                                //Parametros para decrypt
                                 AlgorithmParameters p = AlgorithmParameters.getInstance("PBEWithHmacSHA256AndAES_128");
                                 p.init(params);
 
                                 Cipher cipher = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
                                 cipher.init(Cipher.DECRYPT_MODE, secretKey, p);
     
-                                // Descriptografar os dados
+                                //Decrypt dos dados
                                 byte[] decryptedTemp = cipher.doFinal(recTemp);
                                 String strTemp = new String(decryptedTemp);
     
@@ -373,7 +393,7 @@ public class IoTDevice {
                         e.printStackTrace();
                     }
 
-                } else if (command.startsWith("RI")) { // print("OK" + " " + fileSize + " " + conteudo)
+                } else if (command.startsWith("RI")) {
 
                     try {
                         if (parts.length != 2) {
@@ -389,27 +409,30 @@ public class IoTDevice {
                         if (srvResponse.equals("OK")) {
                             //Key
                             byte[] recKey = (byte[]) in.readObject();
+
+                            //Unwrap da key cifrada recebida
                             Cipher dec = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                             PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
                             dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
                             SecretKey secretKey = (SecretKey) dec.unwrap(recKey, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
     
-                            //Data
+                            //Decrypt da informacao recebida (imagem enviada pelo user para o domain valido) com a domain key
                             byte[] recImg = (byte[]) in.readObject();
                             byte[] params = (byte[]) in.readObject();
-    
+                            
+                            //Parametros para decrypt
                             AlgorithmParameters p = AlgorithmParameters.getInstance("PBEWithHmacSHA256AndAES_128");
                             p.init(params);
     
                             Cipher cipher = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
                             cipher.init(Cipher.DECRYPT_MODE, secretKey, p);
     
-                            // Descriptografar os dados
+                            //Decrypt da data
                             byte[] decryptedImg = cipher.doFinal(recImg);
     
                             String[] reqUser = parts[1].split(":");
     
-                            // Write received file data to the destination file
+                            //Criar file .jpg com os dados decrypted (Formato do nome -> targetUser_targetDevId_received)
                             FileOutputStream fileOutputStream = new FileOutputStream(reqUser[0] + "_" + reqUser[1] + "_received" + ".jpg");
                             fileOutputStream.write(decryptedImg);
                             fileOutputStream.close();
@@ -432,6 +455,7 @@ public class IoTDevice {
 
                     int domSize = (int) in.readObject();
 
+                    //Caso nao esteja em nenhum domain, print "NO DOMAINS", se sim imprimir os nomes dos domains
                     if (domSize == 0) {
                         System.out.println("NO DOMAINS");
                     }
@@ -439,7 +463,11 @@ public class IoTDevice {
                     {
                         for (int i = 0; i < domSize; i++) {
                             String domName = (String) in.readObject();
-                            sb.append(domName + System.getProperty("line.separator"));
+                            sb.append(domName);
+
+                            if (i < domSize - 1) {
+                                sb.append(System.getProperty("line.separator"));
+                            }
                         }
     
                         System.out.println(sb.toString());
@@ -476,7 +504,8 @@ public class IoTDevice {
     public static boolean ei(String sourceFileName, String userId, char[] kstorepass){
         try (
              FileInputStream fileInputStream = new FileInputStream(sourceFileName)) {
-
+            
+            //Verificar se a imagem existe
             try {
                 out.writeObject("found");
                 out.flush();
@@ -484,20 +513,24 @@ public class IoTDevice {
                 e2.printStackTrace();
             }
 
-            // Get the file size
+            //Tamanho da imagem
             File file = new File(sourceFileName);
             int fileSize = (int) file.length();
             byte[] fileData = new byte[fileSize];
-            // Read the entire file into memory
+
+            //Ler os bytes da imagem em memoria
             int bytesRead = 0;
             while (bytesRead < fileSize) {
                 bytesRead += fileInputStream.read(fileData, bytesRead, fileSize - bytesRead);
             }
 
+            //Receber numero de domains em que esta
             int myDomSize = (int) in.readObject();
 
+            //Guardar as chaves de cada domain
             LinkedList<SecretKey> recSKeys = new LinkedList<SecretKey>();
 
+            //Para cada domain, receber e dar unwrap da chave para depois encriptar a informacao com ela
             for (int i = 0; i < myDomSize; i++) {
                 byte[] secretKeyCiph = (byte[]) in.readObject();
 
@@ -505,9 +538,11 @@ public class IoTDevice {
                 PrivateKey myPrivateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
                 dec.init(Cipher.UNWRAP_MODE, myPrivateKey);
                 SecretKey secretKey = (SecretKey) dec.unwrap(secretKeyCiph, "PBEWithHmacSHA256AndAES_128", Cipher.SECRET_KEY);
+
                 recSKeys.add(secretKey);
             }
 
+            //Enviar os bytes da imagem encriptados para cada domain em que esta
             for (int i = 0; i < recSKeys.size(); i++) {
                 Cipher c = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
                 c.init(Cipher.ENCRYPT_MODE, recSKeys.get(i));
@@ -521,7 +556,6 @@ public class IoTDevice {
                 out.flush();
             }
 
-            //close
             fileInputStream.close();
 
             System.out.println("File sent to server successfully.");
@@ -544,48 +578,4 @@ public class IoTDevice {
             return false;
         }
     }
-
-    public static synchronized void ri(String name, int devid, ObjectInputStream in, ObjectOutputStream out, char[] kpass){
-            String destinationFileName = name + "_" + devid + "_received" + ".jpg";
-
-            try {
-                // Receive file size from client
-                int fileSize = in.readInt();
-    
-                // Create buffer to read file data
-                byte[] buffer = new byte[fileSize];
-                int totalBytesRead = 0;
-                int bytesRead;
-                while (totalBytesRead < fileSize && (bytesRead = in.read(buffer, totalBytesRead, fileSize - totalBytesRead)) != -1) {
-                    totalBytesRead += bytesRead;
-                }
-    
-                if (totalBytesRead != fileSize) {
-                    throw new IOException("File size mismatch. Expected: " + fileSize + ", Received: " + totalBytesRead);
-                }
-
-                byte[] recKey = (byte[]) in.readObject();
-
-                Cipher dKey = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                Key myPrivateKey = kstore.getKey(name, kpass);
-                dKey.init(Cipher.DECRYPT_MODE, myPrivateKey);
-                byte[] decKey = dKey.doFinal(recKey);
-
-                SecretKey secretKey = new SecretKeySpec(decKey, "AES");
-
-                Cipher dData = Cipher.getInstance("PBEWithHmacSHA256AndAES_128");
-                dData.init(Cipher.DECRYPT_MODE, secretKey);
-                byte [] dec = dData.doFinal(buffer);
-
-                // Write received file data to the destination file
-                FileOutputStream fileOutputStream = new FileOutputStream(destinationFileName);
-                fileOutputStream.write(dec, 0, totalBytesRead);
-                fileOutputStream.close();
-
-                System.out.println("OK, " + fileSize + " (long)");
-            } catch (Exception e) {
-                System.out.println("An error occurred: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
 }

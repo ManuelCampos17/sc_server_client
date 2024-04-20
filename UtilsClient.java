@@ -1,11 +1,13 @@
+//Grupo 15: Tiago Almeida (58161), Manuel Campos (58166), Tiago Rocha (58242)
+
 import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
@@ -15,12 +17,10 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.util.Map;
 import java.util.Scanner;
-
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.PBEParameterSpec;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -28,41 +28,20 @@ import javax.net.ssl.TrustManagerFactory;
 
 public class UtilsClient {
 
-     // public static SSLSocket initializeClient(String trusStrorePath, String trustStorePassword, String serverAddress, int port){
-    //     SSLSocket s = null;
-
-    //     System.setProperty("javax.net.ssl.trustStore", trusStrorePath);
-    //     System.setProperty("javax.net.ssl.trustStorePassword", trustStorePassword);
-
-    //     try{
-    //         SocketFactory sf = SSLSocketFactory.getDefault();
-    //         s = (SSLSocket) sf.createSocket(serverAddress, port);
-    //     }catch(Exception e){
-    //         e.printStackTrace();
-    //     }
-
-    //     return s;        
-    // }
-
-
     public static SSLSocket initializeClient(String trustStorePath, String trustStorePassword, String serverAddress, int port) {
         SSLSocket socket = null;
         try {
-            // TLS/SSL
+            //TLS/SSL
             SSLContext sslContext = SSLContext.getInstance("TLS");
             
-            // Load the truststore
             KeyStore trustStore = KeyStore.getInstance("JCEKS");
             trustStore.load(new FileInputStream(trustStorePath), trustStorePassword.toCharArray());
             
-            // Initialize trust manager factory with the truststore
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(trustStore);
             
-            // Initialize SSL context with the trust managers
             sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
     
-            // Create the SSLSocket using the SSLContext
             SSLSocketFactory factory = sslContext.getSocketFactory();
             socket = (SSLSocket) factory.createSocket(serverAddress, port);
     
@@ -76,17 +55,18 @@ public class UtilsClient {
 
     public static boolean assymCrypt(ObjectOutputStream out, String userId, ObjectInputStream in, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
         try {
+            //Enviar o userId para o server
             out.writeObject(userId);
             out.flush();
 
             byte[] nonce = (byte[]) in.readObject();
             String regStatus = (String) in.readObject();
 
-            // Tratar a resposta do servidor
+            //Tratar a resposta do servidor
             if (regStatus.equals("notregistered")) {
                 System.out.println("Unknown user. Initiating registering process...");
 
-                // Realizar o registro do usuário
+                //Registar o user
                 boolean regSucc = registerUser(userId, tstore, nonce, out, in, kstore, kstorepass);
 
                 if (regSucc) {
@@ -98,6 +78,7 @@ public class UtilsClient {
             }
             else 
             {
+                //Ir buscar a private key do user a keystore
                 PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kstorepass);
 
                 //Assinar nonce
@@ -105,9 +86,11 @@ public class UtilsClient {
                 sign.initSign(privateKey);
                 sign.update(nonce);
 
+                //Enviar nonce assinado
                 out.writeObject(sign.sign());
                 out.flush();
 
+                //Validado ou nao pelo server
                 String res = (String) in.readObject();
 
                 if (res.equals("checkedvalid")) {
@@ -129,8 +112,10 @@ public class UtilsClient {
 
     private static boolean registerUser(String userId, KeyStore tstore, byte[] nonce, ObjectOutputStream out, ObjectInputStream in, KeyStore kstore, char[] kpass) throws Exception {
         try {
+            //Ir buscar a private key do user a keystore
             PrivateKey privateKey = (PrivateKey) kstore.getKey(userId.split("@")[0], kpass);
 
+            //Enviar outra vez o nonce enviado pelo server
             out.writeObject(nonce);
             out.flush();
 
@@ -139,14 +124,18 @@ public class UtilsClient {
             sign.initSign(privateKey);
             sign.update(nonce);
 
+            //Enviar nonce assinado
             out.writeObject(sign.sign());
             out.flush();
 
+            //Ir buscar o certificado do user
             Certificate cert = kstore.getCertificate(userId.split("@")[0]);
 
+            //Enviar o certificado
             out.writeObject(cert);
             out.flush();
 
+            //Validado ou nao pelo server
             String res = (String) in.readObject();
 
             if (res.equals("checkedvalid")) {
@@ -165,8 +154,10 @@ public class UtilsClient {
 
     public static boolean emailConf(Scanner sc, ObjectOutputStream out, ObjectInputStream in, String userId, KeyStore tstore, KeyStore kstore, char[] kstorepass) {
         try {
+            //Server verifica se foi enviado um email valido (pre definimos como sendo os emails de nos os 3)
             String emailCorrect = (String) in.readObject();
 
+            //Na implementacao, e possivel reintroduzir o email para ser um valido (Extra?)
             while (emailCorrect.equals("no")) {
                 System.out.println("Email invalido, insira um email valido: ");
                 userId = sc.nextLine();
@@ -176,19 +167,25 @@ public class UtilsClient {
 
                 emailCorrect = (String) in.readObject();
             }
+
+            //Ir ver ao email o codigo
             System.out.println("Introduza o codigo enviado pelo servidor: ");
             String code = sc.nextLine();
 
+            //Enviar o codigo ao server
             out.writeObject(code);
             out.flush();
 
+            //Server verifica o codigo
             String codeRes = (String) in.readObject();
             System.out.println(codeRes);
 
+            //Se incorreto, e possivel o o user voltar a tentar a autenticacao desde o inicio do two factor
             if (codeRes.equals("C2FA code incorrect.")) {
                 System.out.println("Deseja tentar autenticar-se de novo? Yes/No:");
                 String respTryAgain = sc.nextLine();
 
+                //Terminar ligacao se nao, se sim invocar outra vez a funcao de inicio
                 if (respTryAgain.equals("No")) {
                     out.writeObject("notryagain");
                     out.flush();
@@ -212,7 +209,7 @@ public class UtilsClient {
         }
     }
 
-    // funcao para enviar o teste do ficheiro executável IoTDevice para o servidor
+    //Funcao para enviar o teste do ficheiro executável IoTDevice para o servidor
     public static String exeCliTest(ObjectOutputStream out, ObjectInputStream in) {
         try {
             // O cliente envia o nome e o tamanho do ficheiro executável IoTDevice (.class)
@@ -276,6 +273,7 @@ public class UtilsClient {
 
             byte[] salt = new byte[16];
 
+            //Se ja tinhamos um salt associado ao domain, usar esse
             if (saltsByDomain.containsKey(dom)) {
                 salt = saltsByDomain.get(dom);
             }
@@ -288,6 +286,7 @@ public class UtilsClient {
 
             int iter = rd.nextInt(1000) + 1;
 
+            //Se ja tinhamos um numero de iteracoes associado ao domain, usar esse
             if (itersByDomain.containsKey(dom)) {
                 iter = itersByDomain.get(dom);
             }
@@ -297,21 +296,35 @@ public class UtilsClient {
             }
 
             if (firstAdd) {
-                // Guardar salt e iter em file exclusivo para cliente
-                BufferedWriter wr = new BufferedWriter(new FileWriter("saltsAndIters_" + userId + ".txt", true));
-                wr.write(dom + ":" + salt + " " + iter + System.getProperty("line.separator"));
+                //Registar novo salt num file exclusivo do cliente para persistencia
+                File newSaltFile = new File("salt_" + userId + "_" + dom + ".txt");
+                newSaltFile.createNewFile();
+
+                try (FileOutputStream fos = new FileOutputStream(newSaltFile)) {
+                    fos.write(salt);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                //Registar nova iter num file exclusivo do cliente para persistencia
+                BufferedWriter wr = new BufferedWriter(new FileWriter("iters_" + userId + ".txt", true));
+                wr.write(dom + ":" + iter + System.getProperty("line.separator"));
                 wr.close();
             }
 
+            //Gerar a domain key
             SecretKey domainKey = UtilsClient.generateDomainKey(password, salt, iter);
 
+            //Get da public key do user que queremos adicionar pelo certificado na trustore
             Certificate cert = tstore.getCertificate(userId.split("@")[0]);
             PublicKey destUserPubKey = cert.getPublicKey();
 
+            //Wrap da domain key com a public key
             Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipher.init(Cipher.WRAP_MODE, destUserPubKey);
             byte[] dkSend = cipher.wrap(domainKey);
 
+            //Enviar a key cifrada para o server
             out.writeObject(dkSend);
             out.flush();
         } catch(Exception e) {
