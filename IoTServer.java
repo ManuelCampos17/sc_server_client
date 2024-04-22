@@ -259,8 +259,8 @@ public class IoTServer {
                 myWriterClient.write("IoTDeviceCopy.class");
                 myWriterClient.close();
 
-                if (new File("IoTDeviceCopy.class").exists()) {
-                    progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+                if (new File("txtFiles/clientProgram.txt").exists()) {
+                    progDataHMAC = UtilsServer.calculateHMAC("txtFiles/clientProgram.txt", pass_cypher, sv_salt);
 
                     // Escrever o conteúdo cifrado para um novo arquivo
                     try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
@@ -271,8 +271,8 @@ public class IoTServer {
             {
                 System.out.println("Client file data already exists.");
 
-                if (!Arrays.equals(UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt), progDataHMAC)) {
-                    System.out.println("Device executable tampered with.");
+                if (!Arrays.equals(UtilsServer.calculateHMAC("txtFiles/clientProgram.txt", pass_cypher, sv_salt), progDataHMAC)) {
+                    System.out.println("Client program data tampered with.");
                     System.exit(-1);
                 }
             }
@@ -652,7 +652,7 @@ public class IoTServer {
                     out.close();
                     in.close();
                     clientSocket.close();
-                    System.out.println("Tampered program data file, disconnecting...");
+                    System.out.println("Program data file tampered with, disconnecting...");
                     return;
                 }
 
@@ -1283,7 +1283,7 @@ public class IoTServer {
                 String C2FA = UtilsServer.generateC2FA();
 
                 //Emails pre definidos pelo grupo como users validos
-                if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
+                if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com") || userId.equals("tiago.laureano.rocha@gmail.com")) {
                     out.writeObject("yes");
                     out.flush();
 
@@ -1301,7 +1301,7 @@ public class IoTServer {
 
                         userId = (String) in.readObject();
 
-                        if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com")) {
+                        if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com") || userId.equals("tiago.laureano.rocha@gmail.com")) {
                             correctEmail = true;
                         }
                     }
@@ -1499,7 +1499,7 @@ public class IoTServer {
 
             serverLock.lock();
             try {
-                if (!Arrays.equals(UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt), progDataHMAC)) {
+                if (!Arrays.equals(UtilsServer.calculateHMAC("txtFiles/clientProgram.txt", pass_cypher, sv_salt), progDataHMAC)) {
                     return -1;
                 }
 
@@ -1539,7 +1539,7 @@ public class IoTServer {
 
                 progInfoReader.close();
 
-                progDataHMAC = UtilsServer.calculateHMAC("IoTDeviceCopy.class", pass_cypher, sv_salt);
+                progDataHMAC = UtilsServer.calculateHMAC("txtFiles/clientProgram.txt", pass_cypher, sv_salt);
 
                 // Escrever o conteúdo cifrado para um novo arquivo
                 try (FileOutputStream outputStream = new FileOutputStream("txtFiles/progDataHMAC.txt")) {
