@@ -19,6 +19,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 import java.util.LinkedList;
@@ -1144,26 +1148,28 @@ public class IoTServer {
                             out.flush();
                     }
                 }
-            } catch (SocketException e) {
+            } catch (SocketException | SSLException e) {
                 System.out.println(("Client \"" + currUser + "_" + currUserDevId + "\" disconnected"));
                 
                 //Em caso de desconexao, remover o device da lista de devices conectados do user
-                serverLock.lock();
-                try{
-                    LinkedList<Integer> removeDevId = new LinkedList<Integer>();
-                    LinkedList<Integer> userDevIds = connected.get(currUser);
+                if (connected.get(currUser) != null) {
+                    serverLock.lock();
+                    try{
+                        LinkedList<Integer> removeDevId = new LinkedList<Integer>();
+                        LinkedList<Integer> userDevIds = connected.get(currUser);
 
-                    for (int d : userDevIds) {
-                        if (d != currUserDevId) {
-                            removeDevId.add(d);
+                        for (int d : userDevIds) {
+                            if (d != currUserDevId) {
+                                removeDevId.add(d);
+                            }
                         }
-                    }
 
-                    if (connected.containsKey(currUser)) {
-                        connected.put(currUser, removeDevId);
+                        if (connected.containsKey(currUser)) {
+                            connected.put(currUser, removeDevId);
+                        }
+                    } finally {
+                        serverLock.unlock();
                     }
-                } finally {
-                    serverLock.unlock();
                 }
                 
             } catch (Exception e) {
@@ -1282,53 +1288,40 @@ public class IoTServer {
                 //4.2.2
                 String C2FA = UtilsServer.generateC2FA();
 
+                Pattern emailPattern = Pattern.compile("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$");
+                Matcher emailMatcher = emailPattern.matcher(userId);
+
                 //Emails pre definidos pelo grupo como users validos
-                if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com") || userId.equals("tiago.laureano.rocha@gmail.com")) {
+                if (emailMatcher.find()) {
                     out.writeObject("yes");
                     out.flush();
 
                     //Enviar o email ao user escolhido
                     sendEmail(userId, C2FA, apiKey);
-                }
-                else 
-                {
-                    boolean correctEmail = false;
 
-                    //Verificar se o email enviado e valido
-                    while (!correctEmail) {
-                        out.writeObject("no");
+                    String recCode = (String) in.readObject();
+
+                    //Verificar se o codigo introduzido esta correto
+                    if (!recCode.equals(C2FA)) {
+                        out.writeObject("C2FA code incorrect.");
                         out.flush();
 
-                        userId = (String) in.readObject();
+                        String userTryAgain = (String) in.readObject();
 
-                        if (userId.equals("tjca2000@gmail.com") || userId.equals("mgacampos10@gmail.com") || userId.equals("tiago.laureano.rocha@gmail.com")) {
-                            correctEmail = true;
+                        //Se nao, voltar ao inicio da two-factor auth
+                        if (userTryAgain.equals("tryagain")) {
+                            authOperations(in, out);
                         }
                     }
-
-                    out.writeObject("yes");
-                    out.flush();
-
-                    sendEmail(userId, C2FA, apiKey);
-                }
-
-                String recCode = (String) in.readObject();
-
-                //Verificar se o codigo introduzido esta correto
-                if (!recCode.equals(C2FA)) {
-                    out.writeObject("C2FA code incorrect.");
-                    out.flush();
-
-                    String userTryAgain = (String) in.readObject();
-
-                    //Se nao, voltar ao inicio da two-factor auth
-                    if (userTryAgain.equals("tryagain")) {
-                        authOperations(in, out);
+                    else 
+                    {
+                        out.writeObject("C2FA code correct. User auth success.");
+                        out.flush();
                     }
                 }
                 else 
                 {
-                    out.writeObject("C2FA code correct. User auth success.");
+                    out.writeObject("no");
                     out.flush();
                 }
             } catch (Exception e) {

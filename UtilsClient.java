@@ -157,15 +157,10 @@ public class UtilsClient {
             //Server verifica se foi enviado um email valido (pre definimos como sendo os emails de nos os 3)
             String emailCorrect = (String) in.readObject();
 
-            //Na implementacao, e possivel reintroduzir o email para ser um valido (Extra?)
-            while (emailCorrect.equals("no")) {
-                System.out.println("Email invalido, insira um email valido: ");
-                userId = sc.nextLine();
-
-                out.writeObject(userId);
-                out.flush();
-
-                emailCorrect = (String) in.readObject();
+            //Email tem de ser válido
+            if (emailCorrect.equals("no")) {
+                System.out.println("Email invalido!");
+                return false;
             }
 
             //Ir ver ao email o codigo
