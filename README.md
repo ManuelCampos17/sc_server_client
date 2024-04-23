@@ -7,11 +7,11 @@ Projeto realizado a 100%, todas as funcionalidades e verificações pedidas fora
 COMO CORRER E COMPILAR:
 
 COMPILE:
-    1 - Compilar o server com <javac IoTServer.java>
+    1 - Compilar o server com <makefile.bat>
 
-    2 - Compilar o client com <javac IoTDevice.java>
+    2 - Compilar o client com <makefile.bat>
 
-    3 - Copiar o IoTDevice.class do lado do server e mudar o nome para IoTDeviceCopy.class
+    3 - Copiar o IoTDevice.jar do lado do server e mudar o nome para IoTDeviceCopy.jar
 
 RUN:
     1 - Correr o server: <java IoTServer [porto] [password-cifra] [keystore] [password-keystore] [2FA-APIKey]>
@@ -50,7 +50,7 @@ INFORMAÇÕES RELATIVAS A FICHEIROS .txt:
     (TODOS OS DADOS ESTÃO GUARDADOS DE FORMA PERSISTENTE)
 
     1.1 - Pasta txtFiles:
-        clientProgram.txt --> Ficheiro que guarda o path da cópia do IoTDevice.class presente no server (executável)
+        clientProgram.txt --> Ficheiro que guarda o path da cópia do IoTDevice.jar presente no server (executável)
 
         domainsInfo.txt --> Ficheiro que guarda informações sobre os dominios e: os respetivos users, devices, bem como o seu criador
 

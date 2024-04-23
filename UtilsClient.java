@@ -207,10 +207,10 @@ public class UtilsClient {
     //Funcao para enviar o teste do ficheiro executável IoTDevice para o servidor
     public static String exeCliTest(ObjectOutputStream out, ObjectInputStream in) {
         try {
-            // O cliente envia o nome e o tamanho do ficheiro executável IoTDevice (.class)
+            // O cliente envia o nome e o tamanho do ficheiro executável IoTDevice (.jar)
             byte[] nonce = (byte[]) in.readObject();
 
-            String flName = "IoTDevice.class";
+            String flName = "IoTDevice.jar";
             File f = new File(flName);
             int flSize = (int) f.length();
 

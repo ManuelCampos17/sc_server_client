@@ -260,7 +260,7 @@ public class IoTServer {
 
                 //Escrever nome e size
                 BufferedWriter myWriterClient = new BufferedWriter(new FileWriter("txtFiles/clientProgram.txt", true));
-                myWriterClient.write("IoTDeviceCopy.class");
+                myWriterClient.write("IoTDeviceCopy.jar");
                 myWriterClient.close();
 
                 if (new File("txtFiles/clientProgram.txt").exists()) {
