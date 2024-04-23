@@ -21,6 +21,8 @@ RUN:
         password-keystore -> "grupoquinze"
         2FA-APIKey (grupo15) -> "zWG5VYlpX9NwOWLvUqn1"
 
+        (ex: java -jar IoTServer.jar 1234 grupoquinze svStor )
+
     2 - Correr o client: <java IoTDevice [ip:porto] [trust-store] [keystore] [password-keystore] [dev-id] [user-id]>
         ip:porto -> Ip e porto do server
         truststore -> "cliTrustStore"
@@ -28,6 +30,8 @@ RUN:
         password-keystore -> "grupoquinze" (keystores pré-definidas) / password escolhida na criação do novo user
         dev-id -> Escolha livre
         user-id -> 3 opções válidas que são os nossos users (terá de ter acesso aos mails) -> "tjca2000@gmail.com" | "mgacampos10@gmail.com" | "tiago.laureano.rocha@gmail.com" (TAMBÉM PODERÁ SER CRIADO UM NOVO USER -> Ver "COMO CRIAR UM NOVO USER")
+
+        (ex: java -jar IoTDevice.jar 127.0.0.1:1234 cliTrustStore manelStore grupoquinze 5 mgacampos10@gmail.com )
 
 Após estes comandos já se pode utilizar o menu presente no Cliente que comunicará com o servidor para transmitir dados e comandos!
 
