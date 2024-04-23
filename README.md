@@ -21,7 +21,7 @@ RUN:
         password-keystore -> "grupoquinze"
         2FA-APIKey (grupo15) -> "zWG5VYlpX9NwOWLvUqn1"
 
-        (ex: java -jar IoTServer.jar 1234 grupoquinze svStor )
+        (ex: java -jar IoTServer.jar 1234 grupoquinze svStor zWG5VYlpX9NwOWLvUqn1)
 
     2 - Correr o client: <java IoTDevice [ip:porto] [trust-store] [keystore] [password-keystore] [dev-id] [user-id]>
         ip:porto -> Ip e porto do server
